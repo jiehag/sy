@@ -155,7 +155,6 @@
             pointer-events: auto;
             -webkit-touch-callout: default;
         }
-        /* 微信长按保存的关键：确保图片元素可被长按 */
         #imageContainer img {
             -webkit-touch-callout: default !important;
             -webkit-user-select: none;
@@ -773,6 +772,8 @@
             align-items: center;
             flex-wrap: wrap;
         }
+
+        /* 新的占位图样式：带 + 号 */
         .empty-thumb-msg {
             color: #9bb7d2;
             font-size: 0.8rem;
@@ -787,7 +788,19 @@
             user-select: none;
         }
         .empty-thumb-msg .icon {
-            font-size: 2rem;
+            font-size: 2.8rem;
+            font-weight: 300;
+            line-height: 1;
+            color: #bdd2e5;
+        }
+        .empty-thumb-msg .icon .plus {
+            font-size: 3.2rem;
+            color: #7c3aed;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .empty-thumb-msg:hover .icon .plus {
+            transform: scale(1.15);
         }
         .empty-thumb-msg .sub-text {
             font-size: 0.6rem;
@@ -798,6 +811,35 @@
         }
         .empty-thumb-msg:hover .sub-text {
             color: #7c3aed;
+        }
+
+        /* 当有图片时，保留 + 占位在最后 */
+        .thumb-add-placeholder {
+            border: 2px dashed #d5e2ef;
+            background: #f8fafd;
+            border-radius: 10px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #b0cada;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+        .thumb-add-placeholder:hover {
+            border-color: #7c3aed;
+            color: #7c3aed;
+            background: #ede9fe;
+            transform: scale(1.02);
+        }
+        .thumb-add-placeholder:active {
+            transform: scale(0.95);
+        }
+        .thumb-add-placeholder .plus {
+            font-size: 3rem;
+            line-height: 1;
         }
 
         .upload-progress-wrap {
@@ -1217,13 +1259,9 @@
                             <span class="params-changed-badge hidden" id="paramsChangedBadge">⚠️ 参数已变更</span>
                         </div>
                     </div>
+                    <!-- 缩略图网格 - 支持拖拽上传，包含 + 占位 -->
                     <div class="thumbnail-grid" id="thumbnailGrid">
-                        <div class="empty-thumb-msg" id="uploadTrigger">
-                            <span class="icon">📷</span>
-                            <span>点击「选择图片」或拖拽上传</span>
-                            <span class="sub-text">支持多张图片同时上传</span>
-                        </div>
-                        <input type="file" id="hiddenFileInput" accept="image/*" multiple style="display:none;">
+                        <!-- 由 JS 动态渲染 -->
                     </div>
                 </div>
 
@@ -1233,7 +1271,6 @@
                 </div>
 
                 <div id="imageContainer">
-                    <!-- 使用 img 标签直接展示，确保长按保存可用 -->
                     <img id="displayImage" class="loading" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%231a1a2e'/%3E%3Ctext x='400' y='300' font-family='Segoe UI, sans-serif' font-size='32' fill='%236b6b8a' text-anchor='middle' dominant-baseline='central'%3E📷 点击缩略图预览%3C/text%3E%3C/svg%3E" alt="预览图片">
                     <div class="preview-badge">🔍 预览</div>
                     <div class="zoom-hint">🔍 点击查看放大</div>
@@ -1379,7 +1416,7 @@
                 </div>
 
                 <div class="status-msg" id="statusMsg">
-                    💡 点击图片区域上传 · 逐个勾选所需图片 · 调整参数后点击「重新生成水印」
+                    💡 点击 + 占位图上传 · 逐个勾选所需图片 · 调整参数后点击「重新生成水印」
                 </div>
             </div>
         </div>
@@ -1393,6 +1430,8 @@
         </div>
         <div class="zoom-info" id="zoomInfo">点击任意处关闭 · 显示嵌入水印效果</div>
     </div>
+
+    <input type="file" id="hiddenFileInput" accept="image/*" multiple style="display:none;">
 
     <script>
         (function() {
@@ -1420,7 +1459,6 @@
             const batchSpinner = document.getElementById('batchSpinner');
             const regenerateMode = document.getElementById('regenerateMode');
             const paramsChangedBadge = document.getElementById('paramsChangedBadge');
-            const uploadTrigger = document.getElementById('uploadTrigger');
             const hiddenFileInput = document.getElementById('hiddenFileInput');
             const longPressHint = document.getElementById('longPressHint');
 
@@ -1476,7 +1514,6 @@
             let isShowingWatermarked = {};
             let paramsChanged = false;
             let currentParams = {};
-            let longPressTimer = null;
 
             // ============ 工具函数 ============
             function updateColorPreview() {
@@ -1643,7 +1680,6 @@
                 if (currentItemId === item.id) {
                     displayImg.src = dataUrl;
                     displayImg.className = 'loaded';
-                    // 微信环境下显示长按提示
                     if (isWechat()) {
                         showLongPressHint(true);
                         setTimeout(() => showLongPressHint(false), 2500);
@@ -1945,7 +1981,7 @@
                 return decoded;
             }
 
-            // ============ 缩略图管理 ============
+            // ============ 缩略图管理（包含 + 占位） ============
             function addBatchItem(file) {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -2011,8 +2047,11 @@
                 });
             }
 
+            // ============ 核心上传函数 - 修复多选问题 ============
             async function uploadFiles(files) {
                 if (isUploading) return;
+                if (!files || files.length === 0) return;
+
                 isUploading = true;
                 uploadProgress.classList.add('active');
 
@@ -2023,8 +2062,16 @@
                 uploadBar.style.width = '0%';
                 uploadText.textContent = `准备上传 ${total} 张图片...`;
 
+                // 使用 for 循环确保所有文件都被处理
                 for (let i = 0; i < files.length; i++) {
                     const f = files[i];
+                    // 检查文件类型
+                    if (!f.type.startsWith('image/')) {
+                        console.warn('跳过非图片文件:', f.name);
+                        failed++;
+                        continue;
+                    }
+
                     const pct = Math.round(((i) / total) * 100);
                     uploadBar.style.width = pct + '%';
                     uploadText.textContent = `📖 读取中 ${i+1}/${total}: ${f.name}`;
@@ -2035,12 +2082,11 @@
                         const donePct = Math.round(((i + 1) / total) * 100);
                         uploadBar.style.width = donePct + '%';
                         uploadText.textContent = `✅ ${i+1}/${total}: ${f.name} (${Math.round(f.size/1024)}KB)`;
-
                     } catch (err) {
                         failed++;
                         console.error('上传失败:', f.name, err);
                         uploadText.textContent = `❌ ${i+1}/${total}: ${f.name} 失败`;
-                        await new Promise(r => setTimeout(r, 300));
+                        await new Promise(r => setTimeout(r, 200));
                     }
                 }
 
@@ -2061,10 +2107,94 @@
                         loadPreviewImmediate(selectedId);
                     }
                     renderThumbnails();
-                } else if (failed > 0) {
+                } else if (failed > 0 && completed === 0) {
                     setStatus(`⚠️ 所有文件上传失败`, false);
                 }
+
+                // 重置 input 以便重复选择相同文件
                 hiddenFileInput.value = '';
+            }
+
+            // ============ 渲染缩略图（包含 + 占位） ============
+            function renderThumbnails() {
+                const fragment = document.createDocumentFragment();
+
+                // 渲染已有图片
+                batchItems.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'thumb-item' + (item.selected ? ' selected' : '');
+                    div.dataset.id = item.id;
+
+                    let statusText = '';
+                    let statusClass = '';
+                    if (item.processed) { statusText = '✅';
+                        statusClass = 'processed'; } else if (item.failed) { statusText = '❌';
+                        statusClass = 'failed'; } else { statusText = `#${index+1}`; }
+
+                    div.innerHTML = `
+                        <img src="${item.thumbUrl}" alt="${item.name}" loading="lazy" decoding="async">
+                        <div class="thumb-checkbox ${item.selected ? 'checked' : ''}" data-id="${item.id}"></div>
+                        <div class="thumb-index">${index+1}</div>
+                        <div class="thumb-status ${statusClass}">${statusText}</div>
+                        <button class="thumb-remove" title="移除">×</button>
+                        <div class="thumb-name">${item.name.length > 18 ? item.name.slice(0,16)+'…' : item.name}</div>
+                    `;
+
+                    const imgEl = div.querySelector('img');
+                    imgEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectedId = item.id;
+                        loadPreview(item.id);
+                    });
+
+                    const checkbox = div.querySelector('.thumb-checkbox');
+                    checkbox.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleSelect(item.id, e);
+                    });
+
+                    div.querySelector('.thumb-remove').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeBatchItem(item.id);
+                    });
+
+                    fragment.appendChild(div);
+                });
+
+                // + 占位图框（始终显示在最后）
+                const addDiv = document.createElement('div');
+                addDiv.className = 'thumb-add-placeholder';
+                addDiv.innerHTML = `<span class="plus">+</span>`;
+                addDiv.title = '添加图片';
+                addDiv.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    hiddenFileInput.click();
+                });
+                // 拖拽上传也支持
+                addDiv.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.style.borderColor = '#7c3aed';
+                    this.style.background = '#ede9fe';
+                });
+                addDiv.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    this.style.borderColor = '#d5e2ef';
+                    this.style.background = '#f8fafd';
+                });
+                addDiv.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.style.borderColor = '#d5e2ef';
+                    this.style.background = '#f8fafd';
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        uploadFiles(files);
+                    }
+                });
+                fragment.appendChild(addDiv);
+
+                thumbnailGrid.innerHTML = '';
+                thumbnailGrid.appendChild(fragment);
+                updateStats();
             }
 
             function loadPreviewImmediate(id) {
@@ -2399,71 +2529,6 @@
                 updateRegenerateMode();
             }
 
-            function renderThumbnails() {
-                if (batchItems.length === 0) {
-                    thumbnailGrid.innerHTML = `
-                        <div class="empty-thumb-msg" id="uploadTrigger">
-                            <span class="icon">📷</span>
-                            <span>点击「选择图片」或拖拽上传</span>
-                            <span class="sub-text">支持多张图片同时上传</span>
-                        </div>
-                    `;
-                    const newTrigger = document.getElementById('uploadTrigger');
-                    if (newTrigger) {
-                        newTrigger.addEventListener('click', function(e) {
-                            hiddenFileInput.click();
-                        });
-                    }
-                    updateStats();
-                    return;
-                }
-
-                const fragment = document.createDocumentFragment();
-                batchItems.forEach((item, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'thumb-item' + (item.selected ? ' selected' : '');
-                    div.dataset.id = item.id;
-
-                    let statusText = '';
-                    let statusClass = '';
-                    if (item.processed) { statusText = '✅';
-                        statusClass = 'processed'; } else if (item.failed) { statusText = '❌';
-                        statusClass = 'failed'; } else { statusText = `#${index+1}`; }
-
-                    div.innerHTML = `
-                        <img src="${item.thumbUrl}" alt="${item.name}" loading="lazy" decoding="async">
-                        <div class="thumb-checkbox ${item.selected ? 'checked' : ''}" data-id="${item.id}"></div>
-                        <div class="thumb-index">${index+1}</div>
-                        <div class="thumb-status ${statusClass}">${statusText}</div>
-                        <button class="thumb-remove" title="移除">×</button>
-                        <div class="thumb-name">${item.name.length > 18 ? item.name.slice(0,16)+'…' : item.name}</div>
-                    `;
-
-                    const imgEl = div.querySelector('img');
-                    imgEl.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        selectedId = item.id;
-                        loadPreview(item.id);
-                    });
-
-                    const checkbox = div.querySelector('.thumb-checkbox');
-                    checkbox.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        toggleSelect(item.id, e);
-                    });
-
-                    div.querySelector('.thumb-remove').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        removeBatchItem(item.id);
-                    });
-
-                    fragment.appendChild(div);
-                });
-                thumbnailGrid.innerHTML = '';
-                thumbnailGrid.appendChild(fragment);
-                updateStats();
-            }
-
             function clearPreview() {
                 displayImg.src =
                     `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%231a1a2e'/%3E%3Ctext x='400' y='300' font-family='Segoe UI, sans-serif' font-size='32' fill='%236b6b8a' text-anchor='middle' dominant-baseline='central'%3E📷 点击缩略图预览%3C/text%3E%3C/svg%3E`;
@@ -2587,7 +2652,6 @@
                             batchProcessBtn.disabled = true;
                             batchProcessBtn.textContent = '⏳ 生成中...';
 
-                            let processed = 0;
                             async function doBatchRegenerateAndDownload(items) {
                                 try {
                                     let successCount = 0;
@@ -2978,14 +3042,7 @@
 
             // ============ 事件绑定 ============
 
-            thumbnailGrid.addEventListener('click', function(e) {
-                if (e.target === thumbnailGrid ||
-                    e.target.closest('.empty-thumb-msg') ||
-                    e.target.closest('#uploadTrigger')) {
-                    hiddenFileInput.click();
-                }
-            });
-
+            // 拖拽上传到整个缩略图区域
             thumbnailGrid.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 this.classList.add('dragover');
@@ -3003,11 +3060,18 @@
                 }
             });
 
+            // 修复：多选文件上传 - 确保所有文件都被处理
             hiddenFileInput.addEventListener('change', function(e) {
                 const files = e.target.files;
-                if (files.length > 0) {
+                if (files && files.length > 0) {
+                    // 直接传递 FileList 对象，uploadFiles 会遍历所有文件
                     uploadFiles(files);
                 }
+                // 重置 input 以便重复选择相同文件（在 uploadFiles 完成后重置）
+                // 但为了避免竞态，使用 setTimeout 延迟重置
+                setTimeout(() => {
+                    hiddenFileInput.value = '';
+                }, 100);
             });
 
             const colorChangeHandler = () => {
@@ -3078,13 +3142,10 @@
             selectAllBtn.addEventListener('click', selectAllItems);
             deselectAllBtn.addEventListener('click', deselectAllItems);
 
-            // ============ 微信长按保存优化：确保图片可被长按 ============
+            // ============ 微信长按保存优化 ============
             function ensureLongPressSave() {
-                // 在微信中，img 元素默认支持长按保存
-                // 我们只需要确保 pointer-events: auto 和 -webkit-touch-callout: default
                 displayImg.style.pointerEvents = 'auto';
                 displayImg.style.webkitTouchCallout = 'default';
-                // 移除可能干扰的父级事件
                 imageContainer.style.pointerEvents = 'auto';
             }
 
@@ -3094,8 +3155,8 @@
                 updateColorPreview();
                 renderThumbnails();
                 updateRegenerateMode();
-                setStatus('💡 点击图片区域上传 · 逐个勾选所需图片 · 8种块大小可选');
-                console.log('🛡️ 频域隐式水印 · 响应式版已启动 (长按保存支持)');
+                setStatus('💡 点击 + 占位图上传 · 逐个勾选所需图片 · 8种块大小可选');
+                console.log('🛡️ 频域隐式水印 · 响应式版已启动 (长按保存支持 + 占位图 + 多选修复)');
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载，请检查网络连接');
                     setStatus('⚠️ JSZip 库加载中，请刷新后重试...', false);
@@ -3103,7 +3164,6 @@
                     console.log('✅ JSZip 已加载');
                 }
 
-                // 确保长按保存功能
                 ensureLongPressSave();
 
                 if (isWechat()) {
@@ -3113,12 +3173,6 @@
                         setTimeout(() => showLongPressHint(false), 3000);
                     }, 1000);
                 }
-
-                // 额外确保图片可被长按
-                displayImg.addEventListener('contextmenu', function(e) {
-                    // 在微信中，长按会触发contextmenu，但不阻止
-                    // 让默认行为正常工作
-                });
             });
         })();
     </script>
