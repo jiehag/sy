@@ -138,6 +138,7 @@
             cursor: pointer;
             -webkit-touch-callout: default;
             user-select: none;
+            -webkit-user-select: none;
         }
         #imageContainer img {
             display: block;
@@ -149,8 +150,17 @@
             background: #1a1a2e;
             transition: opacity 0.3s ease;
             -webkit-touch-callout: default;
+            -webkit-user-select: none;
             user-select: none;
-            pointer-events: none;
+            pointer-events: auto;
+            -webkit-touch-callout: default;
+        }
+        /* 微信长按保存的关键：确保图片元素可被长按 */
+        #imageContainer img {
+            -webkit-touch-callout: default !important;
+            -webkit-user-select: none;
+            user-select: none;
+            pointer-events: auto !important;
         }
         #imageContainer img.loading {
             opacity: 0.5;
@@ -1158,6 +1168,22 @@
             font-size: 0.6rem;
             color: #6d28d9;
         }
+
+        /* 确保图片可被长按保存 */
+        .img-save-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        #displayImage {
+            -webkit-touch-callout: default !important;
+            -webkit-user-select: none;
+            user-select: none;
+            pointer-events: auto !important;
+        }
     </style>
 </head>
 <body>
@@ -1207,6 +1233,7 @@
                 </div>
 
                 <div id="imageContainer">
+                    <!-- 使用 img 标签直接展示，确保长按保存可用 -->
                     <img id="displayImage" class="loading" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%231a1a2e'/%3E%3Ctext x='400' y='300' font-family='Segoe UI, sans-serif' font-size='32' fill='%236b6b8a' text-anchor='middle' dominant-baseline='central'%3E📷 点击缩略图预览%3C/text%3E%3C/svg%3E" alt="预览图片">
                     <div class="preview-badge">🔍 预览</div>
                     <div class="zoom-hint">🔍 点击查看放大</div>
@@ -1397,7 +1424,6 @@
             const hiddenFileInput = document.getElementById('hiddenFileInput');
             const longPressHint = document.getElementById('longPressHint');
 
-            // 下载前重算进度
             const preDownloadProgress = document.getElementById('preDownloadProgress');
             const preFill = document.getElementById('preFill');
             const preText = document.getElementById('preText');
@@ -1453,14 +1479,6 @@
             let longPressTimer = null;
 
             // ============ 工具函数 ============
-            function debounce(fn, delay) {
-                let timer = null;
-                return function(...args) {
-                    clearTimeout(timer);
-                    timer = setTimeout(() => fn.apply(this, args), delay);
-                };
-            }
-
             function updateColorPreview() {
                 const color = watermarkColorInput.value;
                 colorPreview.style.background = color;
@@ -1491,7 +1509,7 @@
                 statusMsg.className = 'status-msg';
             }
 
-            // ============ 长按保存 ============
+            // ============ 长按保存提示 ============
             function showLongPressHint(show) {
                 if (show) {
                     longPressHint.classList.add('show');
@@ -1503,52 +1521,6 @@
             function isWechat() {
                 const ua = navigator.userAgent.toLowerCase();
                 return ua.indexOf('micromessenger') !== -1;
-            }
-
-            function setupLongPress() {
-                let pressTimer = null;
-                let isPressing = false;
-
-                imageContainer.addEventListener('touchstart', function(e) {
-                    if (!currentItemId) return;
-                    if (!isWechat()) return;
-                    const touch = e.touches[0];
-                    if (!touch) return;
-                    const img = displayImg;
-                    const rect = img.getBoundingClientRect();
-                    const x = touch.clientX;
-                    const y = touch.clientY;
-                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                        isPressing = true;
-                        pressTimer = setTimeout(() => {
-                            if (isPressing) {
-                                showLongPressHint(true);
-                                if (navigator.vibrate) navigator.vibrate(30);
-                            }
-                        }, 600);
-                    }
-                }, { passive: true });
-
-                imageContainer.addEventListener('touchmove', function(e) {
-                    if (pressTimer) { clearTimeout(pressTimer);
-                        pressTimer = null; }
-                    isPressing = false;
-                    showLongPressHint(false);
-                }, { passive: true });
-
-                imageContainer.addEventListener('touchend', function(e) {
-                    if (pressTimer) { clearTimeout(pressTimer);
-                        pressTimer = null; }
-                    isPressing = false;
-                    setTimeout(() => showLongPressHint(false), 400);
-                }, { passive: true });
-
-                imageContainer.addEventListener('touchcancel', function(e) {
-                    if (pressTimer) { clearTimeout(pressTimer);
-                        pressTimer = null; }
-                    isPressing = false;
-                    showLongPressHint(false);
-                }, { passive: true });
             }
 
             // ============ 获取当前参数快照 ============
@@ -1671,9 +1643,10 @@
                 if (currentItemId === item.id) {
                     displayImg.src = dataUrl;
                     displayImg.className = 'loaded';
+                    // 微信环境下显示长按提示
                     if (isWechat()) {
                         showLongPressHint(true);
-                        setTimeout(() => showLongPressHint(false), 2000);
+                        setTimeout(() => showLongPressHint(false), 2500);
                     }
                 }
                 return canvas;
@@ -2140,7 +2113,6 @@
                 const strategy = embedStrategySelect.value;
 
                 try {
-                    // 模拟进度
                     if (progressCb) progressCb(10, '初始化...');
                     await new Promise(r => setTimeout(r, 30));
                     if (progressCb) progressCb(30, '计算DCT变换...');
@@ -2282,7 +2254,6 @@
 
                     try {
                         await regenerateSingle(item, (p, msg) => {
-                            // 显示进度在状态栏
                             setStatusLoading(`🔄 生成中 ${p}%: ${msg}`);
                         });
                         refreshPreview(item, true);
@@ -2592,9 +2563,7 @@
                         if (action === 'single') {
                             const item = batchItems.find(i => i.id === currentItemId);
                             if (item) {
-                                // 显示进度条
                                 showPreProgress(true, '⏳ 重新生成水印...', `正在处理: ${item.name}`, 0);
-                                // 禁用下载按钮防止重复点击
                                 downloadBtn.disabled = true;
                                 downloadBtn.textContent = '⏳ 生成中...';
 
@@ -2613,62 +2582,14 @@
                                 });
                             }
                         } else if (action === 'batch') {
-                            // 批量下载前重算
                             const total = selectedItems.length;
                             showPreProgress(true, '⏳ 批量重新生成水印...', `准备处理 ${total} 张图片`, 0);
                             batchProcessBtn.disabled = true;
                             batchProcessBtn.textContent = '⏳ 生成中...';
 
                             let processed = 0;
-                            regenerateBatch(selectedItems, (p, msg) => {
-                                const overall = Math.round((processed / total) * 100);
-                                updatePreProgress(overall, `⏳ 批量生成中 (${processed}/${total})`, msg);
-                            }).then(() => {
-                                showPreProgress(false);
-                                batchProcessBtn.disabled = false;
-                                batchProcessBtn.textContent = '📦 批量打包';
-                                // 继续执行批量下载
-                                processBatchDirect(selectedItems);
-                            }).catch(() => {
-                                showPreProgress(false);
-                                batchProcessBtn.disabled = false;
-                                batchProcessBtn.textContent = '📦 批量打包';
-                                setStatus('❌ 批量重新生成失败，无法下载', false);
-                            });
-                            // 模拟进度更新（实际由regenerateBatch内部回调）
-                            // 这里用间隔更新进度
-                            const interval = setInterval(() => {
-                                if (processed < total) {
-                                    processed++;
-                                    const pct = Math.round((processed / total) * 100);
-                                    updatePreProgress(pct, `⏳ 批量生成中 (${processed}/${total})`, `处理第 ${processed} 张...`);
-                                } else {
-                                    clearInterval(interval);
-                                }
-                            }, 300);
-                            // 但regenerateBatch会自己控制进度，这里只是辅助显示
-                            // 实际上regenerateBatch会调用updatePreProgress
-                            // 把updatePreProgress传给regenerateBatch
-                            // 但为了不冲突，我们重新设计：在regenerateBatch中调用updatePreProgress
-                            // 修改regenerateBatch使用传入的进度回调
-                            // 但我们已经在上面传了回调，所以没问题
-                            // 不过上面的regenerateBatch是原版，需要改造
-                            // 我们在这里重新定义批量下载前的重算逻辑
-                            // 直接调用改造后的regenerateBatch
-                            // 但为了清晰，我们直接在checkAndDownload中处理批量重算+下载
-                            // 由于regenerateBatch已经被改造支持回调，我们直接调用
-                            // 但注意不要重复调用，上面的代码已经调用了regenerateBatch，但会有问题因为regenerateBatch内部已经有进度条
-                            // 我们简化：直接使用改造后的regenerateBatch
-                            // 但是由于上面已经调用了，我们取消上面的调用，改用下面的逻辑
-                            // 为了避免混乱，我们重新整理
-                            // 我们重新实现一个带进度回调的批量重算+下载
                             async function doBatchRegenerateAndDownload(items) {
-                                showPreProgress(true, '⏳ 批量重新生成水印...', `准备处理 ${items.length} 张图片`, 0);
-                                batchProcessBtn.disabled = true;
-                                batchProcessBtn.textContent = '⏳ 生成中...';
-
                                 try {
-                                    // 重新实现批量重算，使用进度回调
                                     let successCount = 0;
                                     let failCount = 0;
                                     for (let i = 0; i < items.length; i++) {
@@ -2676,11 +2597,8 @@
                                         const pct = Math.round(((i + 1) / items.length) * 100);
                                         updatePreProgress(pct, `⏳ 生成中 (${i+1}/${items.length})`, `正在处理: ${item.name}`);
                                         try {
-                                            await regenerateSingle(item, (p, msg) => {
-                                                // 子进度
-                                            });
+                                            await regenerateSingle(item, (p, msg) => {});
                                             successCount++;
-                                            // 更新预览
                                             if (currentItemId === item.id) {
                                                 refreshPreview(item, true);
                                             }
@@ -2698,7 +2616,6 @@
                                     } else {
                                         setStatus(`⚠️ 批量重算完成: 成功 ${successCount} 张, 失败 ${failCount} 张`, false, 'warning');
                                     }
-                                    // 继续执行下载
                                     await processBatchDirect(items);
                                 } catch (e) {
                                     showPreProgress(false);
@@ -2708,13 +2625,6 @@
                                 }
                             }
 
-                            // 取消之前的调用，使用新的
-                            // 但由于外层已经调用了，我们使用一个标志避免重复
-                            // 简单处理：直接执行新的
-                            // 但为了避免冲突，我们重新组织
-                            // 这里直接调用 doBatchRegenerateAndDownload
-                            // 但上面已经调用了 regenerateBatch，会有冲突
-                            // 所以我们用标志控制
                             if (window._batchRegenerating) return;
                             window._batchRegenerating = true;
                             doBatchRegenerateAndDownload(selectedItems).finally(() => {
@@ -2725,7 +2635,6 @@
                     }
                 }
 
-                // 参数未变更，直接下载
                 if (action === 'single') {
                     const item = batchItems.find(i => i.id === currentItemId);
                     if (item) downloadSingleDirect(item);
@@ -3169,6 +3078,16 @@
             selectAllBtn.addEventListener('click', selectAllItems);
             deselectAllBtn.addEventListener('click', deselectAllItems);
 
+            // ============ 微信长按保存优化：确保图片可被长按 ============
+            function ensureLongPressSave() {
+                // 在微信中，img 元素默认支持长按保存
+                // 我们只需要确保 pointer-events: auto 和 -webkit-touch-callout: default
+                displayImg.style.pointerEvents = 'auto';
+                displayImg.style.webkitTouchCallout = 'default';
+                // 移除可能干扰的父级事件
+                imageContainer.style.pointerEvents = 'auto';
+            }
+
             // ============ 初始化 ============
             window.addEventListener('load', function() {
                 blockInfo.textContent = '16×16';
@@ -3176,21 +3095,30 @@
                 renderThumbnails();
                 updateRegenerateMode();
                 setStatus('💡 点击图片区域上传 · 逐个勾选所需图片 · 8种块大小可选');
-                console.log('🛡️ 频域隐式水印 · 响应式版已启动 (长按保存支持 + 下载前进度)');
+                console.log('🛡️ 频域隐式水印 · 响应式版已启动 (长按保存支持)');
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载，请检查网络连接');
                     setStatus('⚠️ JSZip 库加载中，请刷新后重试...', false);
                 } else {
                     console.log('✅ JSZip 已加载');
                 }
-                setupLongPress();
+
+                // 确保长按保存功能
+                ensureLongPressSave();
+
                 if (isWechat()) {
-                    console.log('📱 微信环境检测到，长按提示已启用');
+                    console.log('📱 微信环境检测到，长按保存已启用');
                     setTimeout(() => {
                         showLongPressHint(true);
                         setTimeout(() => showLongPressHint(false), 3000);
                     }, 1000);
                 }
+
+                // 额外确保图片可被长按
+                displayImg.addEventListener('contextmenu', function(e) {
+                    // 在微信中，长按会触发contextmenu，但不阻止
+                    // 让默认行为正常工作
+                });
             });
         })();
     </script>
