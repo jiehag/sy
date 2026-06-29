@@ -74,13 +74,8 @@
             margin-left: 4px;
         }
         @keyframes pulse {
-            0%,
-            100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.6;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
         .sub {
             color: #2c4b66;
@@ -447,9 +442,7 @@
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
         .status-msg.extract-result {
             background: #f0fdf4;
@@ -491,6 +484,31 @@
         .psnr-display {
             background: #ede9fe;
             color: #5b21b6;
+        }
+
+        .block-check-badge {
+            font-size: 0.6rem;
+            padding: 1px 10px;
+            border-radius: 40px;
+            display: inline-block;
+            font-weight: 600;
+        }
+        .block-check-badge.ok {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .block-check-badge.warn {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .block-check-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .block-check-badge.processing {
+            background: #ede9fe;
+            color: #7c3aed;
+            animation: pulse-badge 1s infinite;
         }
 
         .batch-progress {
@@ -773,47 +791,6 @@
             flex-wrap: wrap;
         }
 
-        /* 新的占位图样式：带 + 号 */
-        .empty-thumb-msg {
-            color: #9bb7d2;
-            font-size: 0.8rem;
-            text-align: center;
-            padding: 20px 0;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            user-select: none;
-        }
-        .empty-thumb-msg .icon {
-            font-size: 2.8rem;
-            font-weight: 300;
-            line-height: 1;
-            color: #bdd2e5;
-        }
-        .empty-thumb-msg .icon .plus {
-            font-size: 3.2rem;
-            color: #7c3aed;
-            display: inline-block;
-            transition: transform 0.2s;
-        }
-        .empty-thumb-msg:hover .icon .plus {
-            transform: scale(1.15);
-        }
-        .empty-thumb-msg .sub-text {
-            font-size: 0.6rem;
-            color: #b0cada;
-        }
-        .empty-thumb-msg:hover {
-            color: #7c3aed;
-        }
-        .empty-thumb-msg:hover .sub-text {
-            color: #7c3aed;
-        }
-
-        /* 当有图片时，保留 + 占位在最后 */
         .thumb-add-placeholder {
             border: 2px dashed #d5e2ef;
             background: #f8fafd;
@@ -914,12 +891,8 @@
             display: flex;
         }
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         .zoom-modal .zoom-content {
             position: relative;
@@ -1141,13 +1114,8 @@
             animation: pulse-badge 2s infinite;
         }
         @keyframes pulse-badge {
-            0%,
-            100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.6;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
         @media (max-width: 480px) {
             .params-changed-badge,
@@ -1165,7 +1133,6 @@
             }
         }
 
-        /* 下载前重算进度条 */
         .pre-download-progress {
             margin-top: 6px;
             padding: 8px 12px;
@@ -1211,20 +1178,53 @@
             color: #6d28d9;
         }
 
-        /* 确保图片可被长按保存 */
-        .img-save-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
         #displayImage {
             -webkit-touch-callout: default !important;
             -webkit-user-select: none;
             user-select: none;
             pointer-events: auto !important;
+        }
+
+        /* 生成中遮罩 */
+        .processing-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            border-radius: 14px;
+            z-index: 20;
+            backdrop-filter: blur(4px);
+        }
+        .processing-overlay.active {
+            display: flex;
+        }
+        .processing-overlay .big-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.15);
+            border-top-color: #a78bfa;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        .processing-overlay .overlay-text {
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .processing-overlay .overlay-sub {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.7rem;
+            text-align: center;
+            padding: 0 20px;
         }
     </style>
 </head>
@@ -1259,7 +1259,6 @@
                             <span class="params-changed-badge hidden" id="paramsChangedBadge">⚠️ 参数已变更</span>
                         </div>
                     </div>
-                    <!-- 缩略图网格 - 支持拖拽上传，包含 + 占位 -->
                     <div class="thumbnail-grid" id="thumbnailGrid">
                         <!-- 由 JS 动态渲染 -->
                     </div>
@@ -1275,12 +1274,19 @@
                     <div class="preview-badge">🔍 预览</div>
                     <div class="zoom-hint">🔍 点击查看放大</div>
                     <div class="longpress-hint" id="longPressHint">📱 长按保存图片</div>
+                    <!-- 生成中遮罩 -->
+                    <div class="processing-overlay" id="processingOverlay">
+                        <div class="big-spinner"></div>
+                        <div class="overlay-text" id="overlayText">⏳ 正在生成水印...</div>
+                        <div class="overlay-sub" id="overlaySub">请稍候，正在处理图片</div>
+                    </div>
                 </div>
                 <div class="info-row">
                     <span class="size-info" id="imageSizeInfo">—</span>
                     <span class="size-info" id="watermarkStatus">⚪ 未嵌入</span>
                     <span class="block-info" id="blockInfo">16×16</span>
                     <span class="psnr-display" id="psnrDisplay"></span>
+                    <span class="block-check-badge" id="blockCheckBadge">⏳ 检测中</span>
                 </div>
                 <div class="batch-progress hidden" id="batchProgress">
                     <div class="bar" id="batchBar"></div>
@@ -1297,7 +1303,6 @@
                     <div class="status-detail" id="batchStatusDetail">⏳ 准备开始...</div>
                 </div>
 
-                <!-- 下载前重算进度条 -->
                 <div class="pre-download-progress" id="preDownloadProgress">
                     <div class="pre-bar-wrap">
                         <span class="pre-status" id="preStatus">⏳ 重新生成水印...</span>
@@ -1442,6 +1447,7 @@
             const watermarkStatus = document.getElementById('watermarkStatus');
             const blockInfo = document.getElementById('blockInfo');
             const psnrDisplay = document.getElementById('psnrDisplay');
+            const blockCheckBadge = document.getElementById('blockCheckBadge');
             const batchProgress = document.getElementById('batchProgress');
             const batchBar = document.getElementById('batchBar');
             const batchProgressText = document.getElementById('batchProgressText');
@@ -1461,6 +1467,9 @@
             const paramsChangedBadge = document.getElementById('paramsChangedBadge');
             const hiddenFileInput = document.getElementById('hiddenFileInput');
             const longPressHint = document.getElementById('longPressHint');
+            const processingOverlay = document.getElementById('processingOverlay');
+            const overlayText = document.getElementById('overlayText');
+            const overlaySub = document.getElementById('overlaySub');
 
             const preDownloadProgress = document.getElementById('preDownloadProgress');
             const preFill = document.getElementById('preFill');
@@ -1558,6 +1567,65 @@
             function isWechat() {
                 const ua = navigator.userAgent.toLowerCase();
                 return ua.indexOf('micromessenger') !== -1;
+            }
+
+            // ============ 块大小适配检测 ============
+            function checkBlockSizeCompatibility(item, blockSize) {
+                if (!item) return { ok: false, reason: '无图片' };
+                const w = item.width;
+                const h = item.height;
+                const bs = blockSize || parseInt(blockSizeSelect.value) || 16;
+
+                const blocksW = Math.floor(w / bs);
+                const blocksH = Math.floor(h / bs);
+                const totalBlocks = blocksW * blocksH;
+
+                if (totalBlocks < 4) {
+                    return { ok: false, reason: `块 ${bs}×${bs} 过大 (${w}×${h})，至少需要4个块`, blocks: totalBlocks };
+                }
+                if (totalBlocks < 16) {
+                    return { ok: false, reason: `块 ${bs}×${bs} 偏大 (${w}×${h})，建议减小块大小`, blocks: totalBlocks, warn: true };
+                }
+                if (w < bs || h < bs) {
+                    return { ok: false, reason: `图片尺寸 (${w}×${h}) 小于块大小 ${bs}×${bs}` };
+                }
+                return { ok: true, blocks: totalBlocks, w: blocksW, h: blocksH };
+            }
+
+            function updateBlockCheckBadge(item) {
+                if (!item) {
+                    blockCheckBadge.textContent = '⏳ 检测中';
+                    blockCheckBadge.className = 'block-check-badge';
+                    return;
+                }
+                const bs = parseInt(blockSizeSelect.value) || 16;
+                const result = checkBlockSizeCompatibility(item, bs);
+
+                if (result.ok) {
+                    blockCheckBadge.textContent = `✅ ${result.w}×${result.h} 块 (共${result.blocks}块)`;
+                    blockCheckBadge.className = 'block-check-badge ok';
+                } else if (result.warn) {
+                    blockCheckBadge.textContent = `⚠️ ${result.reason}`;
+                    blockCheckBadge.className = 'block-check-badge warn';
+                } else {
+                    blockCheckBadge.textContent = `❌ ${result.reason}`;
+                    blockCheckBadge.className = 'block-check-badge error';
+                }
+            }
+
+            function checkCurrentBlockSize() {
+                if (!currentItemId) {
+                    blockCheckBadge.textContent = '⏳ 检测中';
+                    blockCheckBadge.className = 'block-check-badge';
+                    return;
+                }
+                const item = batchItems.find(i => i.id === currentItemId);
+                if (!item) {
+                    blockCheckBadge.textContent = '⏳ 检测中';
+                    blockCheckBadge.className = 'block-check-badge';
+                    return;
+                }
+                updateBlockCheckBadge(item);
             }
 
             // ============ 获取当前参数快照 ============
@@ -1684,18 +1752,20 @@
                         showLongPressHint(true);
                         setTimeout(() => showLongPressHint(false), 2500);
                     }
+                    updateBlockCheckBadge(item);
                 }
                 return canvas;
             }
 
-            // ============ DCT核心 ============
+            // ============ DCT核心 - 优化版 ============
             function dct2d(matrix, n) {
                 const result = new Float64Array(n * n);
+                const sqrt2 = Math.SQRT2;
                 for (let u = 0; u < n; u++) {
                     for (let v = 0; v < n; v++) {
                         let sum = 0;
-                        const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
-                        const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+                        const cu = u === 0 ? 1 / sqrt2 : 1;
+                        const cv = v === 0 ? 1 / sqrt2 : 1;
                         for (let x = 0; x < n; x++) {
                             const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
                             for (let y = 0; y < n; y++) {
@@ -1711,14 +1781,15 @@
 
             function idct2d(dctMatrix, n) {
                 const result = new Float64Array(n * n);
+                const sqrt2 = Math.SQRT2;
                 for (let x = 0; x < n; x++) {
                     for (let y = 0; y < n; y++) {
                         let sum = 0;
                         for (let u = 0; u < n; u++) {
-                            const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
+                            const cu = u === 0 ? 1 / sqrt2 : 1;
                             const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
                             for (let v = 0; v < n; v++) {
-                                const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+                                const cv = v === 0 ? 1 / sqrt2 : 1;
                                 const cosY = Math.cos((2 * y + 1) * v * Math.PI / (2 * n));
                                 sum += cu * cv * dctMatrix[u * n + v] * cosX * cosY;
                             }
@@ -1771,8 +1842,7 @@
             }
 
             function bitsToMessage(bits) {
-                let chars = [],
-                    i = 0;
+                let chars = [], i = 0;
                 while (i < bits.length - 7) {
                     let code = 0;
                     for (let j = 0; j < 8; j++) {
@@ -1873,13 +1943,21 @@
                 return bits;
             }
 
-            function embedWatermarkToData(imageData, width, height, message, key, strength, blockSize, eccMethod, midFreqPos,
-                strategy) {
+            // ============ 异步分块水印嵌入 - 防止页面无响应 ============
+            async function embedWatermarkToDataAsync(imageData, width, height, message, key, strength, blockSize, eccMethod, midFreqPos,
+                strategy, progressCb) {
+                const bs = blockSize || parseInt(blockSizeSelect.value) || 16;
+                const blocksW = Math.floor(width / bs);
+                const blocksH = Math.floor(height / bs);
+                const totalBlocks = blocksW * blocksH;
+
+                if (totalBlocks < 4) {
+                    throw new Error(`图片 (${width}×${height}) 太小，块大小 ${bs}×${bs} 过大 (仅 ${totalBlocks} 个块，需要至少4个)`);
+                }
+
                 const data = new Uint8ClampedArray(imageData.data);
-                const blocksPerRow = Math.floor(width / blockSize);
-                const blocksPerCol = Math.floor(height / blockSize);
-                const totalBlocks = blocksPerRow * blocksPerCol;
-                if (totalBlocks < 4) throw new Error(`图片太小 (${width}×${height})，块大小 ${blockSize} 过大`);
+                const blocksPerRow = blocksW;
+                const blocksPerCol = blocksH;
 
                 let rawBits = messageToBits(message, key);
                 let encodedBits = encodeWithECC(rawBits, eccMethod);
@@ -1891,25 +1969,31 @@
                 const count = strategy === 'dual' ? 2 : 3;
                 for (let i = 0; i < count; i++) {
                     const offset = (i - (count - 1) / 2) * 0.06;
-                    const xPos = Math.floor(blockSize * (midPos + offset));
-                    const yPos = Math.floor(blockSize * (midPos + offset - 0.05));
-                    if (xPos < blockSize && yPos < blockSize && xPos >= 0 && yPos >= 0) {
+                    const xPos = Math.floor(bs * (midPos + offset));
+                    const yPos = Math.floor(bs * (midPos + offset - 0.05));
+                    if (xPos < bs && yPos < bs && xPos >= 0 && yPos >= 0) {
                         positions.push({ x: xPos, y: yPos });
                     }
                 }
                 if (positions.length === 0) {
-                    const defaultPos = Math.floor(blockSize * 0.45);
-                    positions.push({ x: defaultPos, y: Math.floor(blockSize * 0.4) });
+                    const defaultPos = Math.floor(bs * 0.45);
+                    positions.push({ x: defaultPos, y: Math.floor(bs * 0.4) });
                 }
 
-                const n = blockSize;
+                const n = bs;
+                let processedBlocks = 0;
+                const totalBlocksToProcess = blocksPerCol * blocksPerRow;
+
+                // 分批处理，每批处理一定数量的块，然后让出主线程
+                const BATCH_SIZE = Math.max(1, Math.min(20, Math.floor(totalBlocksToProcess / 20)));
+
                 for (let by = 0; by < blocksPerCol; by++) {
                     for (let bx = 0; bx < blocksPerRow; bx++) {
                         const blockIdx = by * blocksPerRow + bx;
                         if (blockIdx >= bitsToEmbed.length) break;
                         const bit = bitsToEmbed[blockIdx];
-                        const startX = bx * blockSize;
-                        const startY = by * blockSize;
+                        const startX = bx * bs;
+                        const startY = by * bs;
 
                         const yBlock = extractYBlock(data, width, startX, startY, n);
                         const dct = dct2d(yBlock, n);
@@ -1924,6 +2008,15 @@
 
                         const idct = idct2d(dct, n);
                         writeYBlock(data, width, startX, startY, idct, n);
+
+                        processedBlocks++;
+
+                        // 每处理一批，让出主线程并更新进度
+                        if (processedBlocks % BATCH_SIZE === 0 || processedBlocks === totalBlocksToProcess) {
+                            const pct = Math.round((processedBlocks / totalBlocksToProcess) * 100);
+                            if (progressCb) progressCb(pct, `处理中 ${processedBlocks}/${totalBlocksToProcess} 块`);
+                            await new Promise(r => setTimeout(r, 0));
+                        }
                     }
                 }
 
@@ -1981,7 +2074,7 @@
                 return decoded;
             }
 
-            // ============ 缩略图管理（包含 + 占位） ============
+            // ============ 缩略图管理 ============
             function addBatchItem(file) {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -1994,11 +2087,8 @@
 
                             const thumbCanvas = document.createElement('canvas');
                             const maxSize = 120;
-                            let tw = w,
-                                th = h;
-                            if (tw > th) { th = th * maxSize / tw;
-                                tw = maxSize; } else { tw = tw * maxSize / th;
-                                th = maxSize; }
+                            let tw = w, th = h;
+                            if (tw > th) { th = th * maxSize / tw; tw = maxSize; } else { tw = tw * maxSize / th; th = maxSize; }
                             thumbCanvas.width = Math.round(tw);
                             thumbCanvas.height = Math.round(th);
                             const tCtx = thumbCanvas.getContext('2d');
@@ -2047,7 +2137,6 @@
                 });
             }
 
-            // ============ 核心上传函数 - 修复多选问题 ============
             async function uploadFiles(files) {
                 if (isUploading) return;
                 if (!files || files.length === 0) return;
@@ -2062,10 +2151,8 @@
                 uploadBar.style.width = '0%';
                 uploadText.textContent = `准备上传 ${total} 张图片...`;
 
-                // 使用 for 循环确保所有文件都被处理
                 for (let i = 0; i < files.length; i++) {
                     const f = files[i];
-                    // 检查文件类型
                     if (!f.type.startsWith('image/')) {
                         console.warn('跳过非图片文件:', f.name);
                         failed++;
@@ -2111,15 +2198,14 @@
                     setStatus(`⚠️ 所有文件上传失败`, false);
                 }
 
-                // 重置 input 以便重复选择相同文件
-                hiddenFileInput.value = '';
+                setTimeout(() => {
+                    hiddenFileInput.value = '';
+                }, 100);
             }
 
-            // ============ 渲染缩略图（包含 + 占位） ============
             function renderThumbnails() {
                 const fragment = document.createDocumentFragment();
 
-                // 渲染已有图片
                 batchItems.forEach((item, index) => {
                     const div = document.createElement('div');
                     div.className = 'thumb-item' + (item.selected ? ' selected' : '');
@@ -2127,8 +2213,7 @@
 
                     let statusText = '';
                     let statusClass = '';
-                    if (item.processed) { statusText = '✅';
-                        statusClass = 'processed'; } else if (item.failed) { statusText = '❌';
+                    if (item.processed) { statusText = '✅'; statusClass = 'processed'; } else if (item.failed) { statusText = '❌';
                         statusClass = 'failed'; } else { statusText = `#${index+1}`; }
 
                     div.innerHTML = `
@@ -2161,7 +2246,6 @@
                     fragment.appendChild(div);
                 });
 
-                // + 占位图框（始终显示在最后）
                 const addDiv = document.createElement('div');
                 addDiv.className = 'thumb-add-placeholder';
                 addDiv.innerHTML = `<span class="plus">+</span>`;
@@ -2170,7 +2254,6 @@
                     e.stopPropagation();
                     hiddenFileInput.click();
                 });
-                // 拖拽上传也支持
                 addDiv.addEventListener('dragover', function(e) {
                     e.preventDefault();
                     this.style.borderColor = '#7c3aed';
@@ -2228,9 +2311,10 @@
 
                 updateParamsSnapshot();
                 checkParamsChanged();
+                updateBlockCheckBadge(item);
             }
 
-            // ============ 单张重新生成（带进度回调） ============
+            // ============ 单张重新生成 - 异步版本 ============
             async function regenerateSingle(item, progressCb) {
                 if (!item) return null;
 
@@ -2242,19 +2326,23 @@
                 const midFreqPos = midFreqSelect.value;
                 const strategy = embedStrategySelect.value;
 
-                try {
-                    if (progressCb) progressCb(10, '初始化...');
-                    await new Promise(r => setTimeout(r, 30));
-                    if (progressCb) progressCb(30, '计算DCT变换...');
-                    await new Promise(r => setTimeout(r, 30));
+                const checkResult = checkBlockSizeCompatibility(item, blockSize);
+                if (!checkResult.ok) {
+                    throw new Error(`块大小不兼容: ${checkResult.reason}`);
+                }
 
-                    const result = embedWatermarkToData(
+                try {
+                    if (progressCb) progressCb(5, '初始化...');
+
+                    const result = await embedWatermarkToDataAsync(
                         item.imageData, item.width, item.height,
-                        message, key, strength, blockSize, eccMethod, midFreqPos, strategy
+                        message, key, strength, blockSize, eccMethod, midFreqPos, strategy,
+                        (pct, msg) => {
+                            if (progressCb) progressCb(10 + pct * 0.85, msg);
+                        }
                     );
 
-                    if (progressCb) progressCb(70, '嵌入水印...');
-                    await new Promise(r => setTimeout(r, 30));
+                    if (progressCb) progressCb(98, '完成处理...');
 
                     item.watermarkedData = result.imageData;
                     item._cacheKey = `${message}|${key}|${strength}|${blockSize}|${eccMethod}|${midFreqPos}|${strategy}`;
@@ -2380,12 +2468,20 @@
                     regenerateBtn.textContent = '⏳ 生成中...';
                     setStatusLoading(`🔄 正在重新生成水印: ${item.name}`);
 
+                    // 显示遮罩
+                    processingOverlay.classList.add('active');
+                    overlayText.textContent = '⏳ 正在生成水印...';
+                    overlaySub.textContent = `处理中: ${item.name}`;
+
                     await new Promise(r => setTimeout(r, 30));
 
                     try {
                         await regenerateSingle(item, (p, msg) => {
-                            setStatusLoading(`🔄 生成中 ${p}%: ${msg}`);
+                            overlayText.textContent = `⏳ 生成中 ${Math.round(p)}%`;
+                            overlaySub.textContent = msg || `处理中: ${item.name}`;
+                            setStatusLoading(`🔄 生成中 ${Math.round(p)}%: ${msg}`);
                         });
+                        processingOverlay.classList.remove('active');
                         refreshPreview(item, true);
                         watermarkStatus.textContent = '✅ 已嵌入 (预览)';
                         watermarkStatus.style.color = '#1d7a5e';
@@ -2393,6 +2489,7 @@
                         renderThumbnails();
                         setStatus(`✅ 水印重新生成完成! PSNR: ${item.psnr ? item.psnr.toFixed(2) + 'dB' : 'N/A'}`);
                     } catch (e) {
+                        processingOverlay.classList.remove('active');
                         setStatus('❌ 水印生成失败: ' + e.message, false);
                         watermarkStatus.textContent = '⚠️ 生成失败';
                         watermarkStatus.style.color = '#dc2626';
@@ -2460,6 +2557,7 @@
                 }
 
                 checkParamsChanged();
+                updateBlockCheckBadge(item);
             }
 
             // ============ 勾选切换 ============
@@ -2516,6 +2614,9 @@
                 paramsChanged = false;
                 currentParams = {};
                 setStatus('📂 列表已清空');
+                blockCheckBadge.textContent = '⏳ 检测中';
+                blockCheckBadge.className = 'block-check-badge';
+                processingOverlay.classList.remove('active');
             }
 
             function getSelectedItems() {
@@ -2546,6 +2647,9 @@
                 paramsChanged = false;
                 currentParams = {};
                 showLongPressHint(false);
+                blockCheckBadge.textContent = '⏳ 检测中';
+                blockCheckBadge.className = 'block-check-badge';
+                processingOverlay.classList.remove('active');
             }
 
             // ============ 放大功能 ============
@@ -2622,6 +2726,27 @@
             function checkAndDownload(action, selectedItems) {
                 checkParamsChanged();
 
+                if (action === 'single') {
+                    const item = batchItems.find(i => i.id === currentItemId);
+                    if (item) {
+                        const bs = parseInt(blockSizeSelect.value) || 16;
+                        const result = checkBlockSizeCompatibility(item, bs);
+                        if (!result.ok) {
+                            setStatus(`❌ 无法下载: ${result.reason}`, false);
+                            return;
+                        }
+                    }
+                } else if (action === 'batch') {
+                    for (const item of selectedItems) {
+                        const bs = parseInt(blockSizeSelect.value) || 16;
+                        const result = checkBlockSizeCompatibility(item, bs);
+                        if (!result.ok) {
+                            setStatus(`❌ 无法下载 "${item.name}": ${result.reason}`, false);
+                            return;
+                        }
+                    }
+                }
+
                 if (paramsChanged) {
                     const confirmMsg = `⚠️ 参数已变更，当前水印数据使用的是旧参数。\n\n是否按新参数重新生成并下载？\n\n点击「确定」重新生成并下载\n点击「取消」使用旧参数下载`;
                     if (confirm(confirmMsg)) {
@@ -2631,19 +2756,26 @@
                                 showPreProgress(true, '⏳ 重新生成水印...', `正在处理: ${item.name}`, 0);
                                 downloadBtn.disabled = true;
                                 downloadBtn.textContent = '⏳ 生成中...';
+                                processingOverlay.classList.add('active');
+                                overlayText.textContent = '⏳ 正在生成水印...';
+                                overlaySub.textContent = `处理中: ${item.name}`;
 
                                 regenerateSingle(item, (p, msg) => {
                                     updatePreProgress(p, `⏳ 生成中...`, msg);
+                                    overlayText.textContent = `⏳ 生成中 ${Math.round(p)}%`;
+                                    overlaySub.textContent = msg || `处理中: ${item.name}`;
                                 }).then(() => {
                                     showPreProgress(false);
                                     downloadBtn.disabled = false;
                                     downloadBtn.textContent = '⬇️ 单张下载';
+                                    processingOverlay.classList.remove('active');
                                     downloadSingleDirect(item);
-                                }).catch(() => {
+                                }).catch((err) => {
                                     showPreProgress(false);
                                     downloadBtn.disabled = false;
                                     downloadBtn.textContent = '⬇️ 单张下载';
-                                    setStatus('❌ 重新生成失败，无法下载', false);
+                                    processingOverlay.classList.remove('active');
+                                    setStatus('❌ 重新生成失败: ' + err.message, false);
                                 });
                             }
                         } else if (action === 'batch') {
@@ -2707,7 +2839,7 @@
                 }
             }
 
-            // ============ 单张下载（直接执行） ============
+            // ============ 单张下载 ============
             function downloadSingleDirect(item) {
                 try {
                     const useWatermarked = item.watermarkedData ? true : false;
@@ -2746,7 +2878,7 @@
                 }
             }
 
-            // ============ 批量下载（直接执行） ============
+            // ============ 批量下载 ============
             async function processBatchDirect(selected) {
                 if (selected.length === 0) {
                     setStatus('⚠️ 请至少选择一张图片', false);
@@ -2815,9 +2947,12 @@
                         setStatusLoading(`📦 处理中 ${i+1}/${total}: ${item.name}...`);
 
                         if (!item.watermarkedData) {
-                            const result = embedWatermarkToData(
+                            const result = await embedWatermarkToDataAsync(
                                 item.imageData, item.width, item.height,
-                                message, key, strength, blockSize, eccMethod, midFreqPos, strategy
+                                message, key, strength, blockSize, eccMethod, midFreqPos, strategy,
+                                (p, msg) => {
+                                    batchStatusDetail.innerHTML = `🔄 嵌入水印 ${p}%: ${item.name}`;
+                                }
                             );
                             item.watermarkedData = result.imageData;
                             item._cacheKey =
@@ -3038,11 +3173,13 @@
                 setStatus('🔄 已重置');
                 showLongPressHint(false);
                 showPreProgress(false);
+                blockCheckBadge.textContent = '⏳ 检测中';
+                blockCheckBadge.className = 'block-check-badge';
+                processingOverlay.classList.remove('active');
             }
 
             // ============ 事件绑定 ============
 
-            // 拖拽上传到整个缩略图区域
             thumbnailGrid.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 this.classList.add('dragover');
@@ -3060,15 +3197,11 @@
                 }
             });
 
-            // 修复：多选文件上传 - 确保所有文件都被处理
             hiddenFileInput.addEventListener('change', function(e) {
                 const files = e.target.files;
                 if (files && files.length > 0) {
-                    // 直接传递 FileList 对象，uploadFiles 会遍历所有文件
                     uploadFiles(files);
                 }
-                // 重置 input 以便重复选择相同文件（在 uploadFiles 完成后重置）
-                // 但为了避免竞态，使用 setTimeout 延迟重置
                 setTimeout(() => {
                     hiddenFileInput.value = '';
                 }, 100);
@@ -3110,12 +3243,24 @@
                     }
                 }
                 checkParamsChanged();
+                if (currentItemId) {
+                    const item = batchItems.find(i => i.id === currentItemId);
+                    if (item) {
+                        updateBlockCheckBadge(item);
+                    }
+                }
             };
 
             blockSizeSelect.addEventListener('change', function() {
                 const val = this.value;
                 blockInfo.textContent = val + '×' + val;
                 paramChangeHandler();
+                if (currentItemId) {
+                    const item = batchItems.find(i => i.id === currentItemId);
+                    if (item) {
+                        updateBlockCheckBadge(item);
+                    }
+                }
             });
             midFreqSelect.addEventListener('change', paramChangeHandler);
             embedStrategySelect.addEventListener('change', paramChangeHandler);
@@ -3156,7 +3301,7 @@
                 renderThumbnails();
                 updateRegenerateMode();
                 setStatus('💡 点击 + 占位图上传 · 逐个勾选所需图片 · 8种块大小可选');
-                console.log('🛡️ 频域隐式水印 · 响应式版已启动 (长按保存支持 + 占位图 + 多选修复)');
+                console.log('🛡️ 频域隐式水印 · 异步版已启动 (防止页面无响应)');
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载，请检查网络连接');
                     setStatus('⚠️ JSZip 库加载中，请刷新后重试...', false);
@@ -3173,6 +3318,9 @@
                         setTimeout(() => showLongPressHint(false), 3000);
                     }, 1000);
                 }
+
+                blockCheckBadge.textContent = '⏳ 请选择图片';
+                blockCheckBadge.className = 'block-check-badge';
             });
         })();
     </script>
