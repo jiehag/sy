@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>频域隐式水印 · 多块大小 · Worker加速 · 视频水印 · 断点续传</title>
+    <title>频域隐式水印 · 多块大小 · Worker加速 · 视频水印 · 智能续传</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
@@ -11,7 +11,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
     </script>
     <style>
-        /* === 样式与原来保持一致 + 新增断点续传相关样式 === */
+        /* === 样式与原来保持一致 + 新增续传按钮智能显示 === */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -489,6 +489,9 @@
         .btn-resume:hover {
             background: #0f766e;
             border-color: #0f766e;
+        }
+        .btn-resume.hidden {
+            display: none !important;
         }
         .file-input-wrap {
             display: none;
@@ -1460,6 +1463,45 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        .btn-resume.hidden {
+            display: none !important;
+        }
+        /* 续传按钮智能显示辅助 */
+        .resume-badge-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .resume-badge-wrap .badge-resume-pending {
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 0.5rem;
+            padding: 1px 8px;
+            border-radius: 30px;
+            font-weight: 600;
+            border: 1px solid #fcd34d;
+            animation: pulse-badge 2s infinite;
+        }
+        /* 上传失败重试按钮 */
+        .retry-upload-btn {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 0 1 auto;
+        }
+        .retry-upload-btn:hover {
+            background: #d97706;
+            border-color: #d97706;
+        }
+        .retry-upload-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -1474,10 +1516,10 @@
             <span class="badge-pdf-export">📤 PDF导出</span>
             <span class="badge-worker">⚡ Worker</span>
             <span class="badge-video">🎬 视频水印</span>
-            <span class="badge-resume">⏳ 断点续传</span>
+            <span class="badge-resume">⏳ 智能续传</span>
         </h1>
         <div class="sub">
-            <span>⚡ 8种块大小 · 逐个勾选 · 批量打包下载 · 导出PDF · Worker加速 · 视频水印 · 多种编码 · 断点续传</span>
+            <span>⚡ 8种块大小 · 逐个勾选 · 批量打包下载 · 导出PDF · Worker加速 · 视频水印 · 多种编码 · 智能续传</span>
             <span class="stats" id="algoStats">DCT · 三频嵌入 · RS纠错 · PDF支持 · Web Worker · H.264/H.265/AV1/VP9</span>
         </div>
 
@@ -1498,6 +1540,10 @@
                         <div class="batch-info">
                             <span class="format-hint">PNG/MP4</span>
                             <span class="params-changed-badge hidden" id="paramsChangedBadge">⚠️ 参数已变更</span>
+                            <span id="resumeBadgeWrap" class="resume-badge-wrap hidden">
+                                <span class="badge-resume-pending" id="resumePendingBadge">⏳ 待续传</span>
+                            </span>
+                            <button class="retry-upload-btn hidden" id="retryUploadBtn">🔄 重试失败</button>
                         </div>
                     </div>
                     <div class="thumbnail-grid" id="thumbnailGrid">
@@ -1717,7 +1763,7 @@
                         🔄 重新生成水印
                     </button>
                     <span class="regenerate-hint" id="regenerateMode">单张</span>
-                    <button class="btn btn-resume btn-sm" id="resumeBatchBtn" style="flex:0 1 auto;">
+                    <button class="btn btn-resume btn-sm hidden" id="resumeBatchBtn" style="flex:0 1 auto;">
                         ⏩ 续传
                     </button>
                 </div>
@@ -1732,7 +1778,7 @@
                 </div>
 
                 <div class="status-msg" id="statusMsg">
-                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 断点续传
+                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传
                 </div>
             </div>
         </div>
@@ -1790,6 +1836,9 @@
             const overlaySub = document.getElementById('overlaySub');
             const workerStatus = document.getElementById('workerStatus');
             const resumeStatus = document.getElementById('resumeStatus');
+            const resumeBadgeWrap = document.getElementById('resumeBadgeWrap');
+            const resumePendingBadge = document.getElementById('resumePendingBadge');
+            const retryUploadBtn = document.getElementById('retryUploadBtn');
 
             const preDownloadProgress = document.getElementById('preDownloadProgress');
             const preFill = document.getElementById('preFill');
@@ -1869,6 +1918,8 @@
                 results: [],
                 cancelled: false
             };
+            // 上传失败记录
+            let failedUploads = [];
 
             // ============ Web Worker 封装 (与原来一致) ============
             let worker = null;
@@ -1878,44 +1929,64 @@
             function initWorker() {
                 try {
                     const workerCode = `
-                        // ---- Worker 内部实现 ----
-                        function dct2d(matrix, n) {
-                            const result = new Float64Array(n * n);
+                        // ---- Worker 内部实现 (优化版: 预计算余弦LUT) ----
+                        const _dctLUTCache = {};
+                        function getDCTLUT(n) {
+                            if (_dctLUTCache[n]) return _dctLUTCache[n];
                             const sqrt2 = Math.SQRT2;
+                            const cuArr = new Float64Array(n);
+                            const cosN = new Float64Array(n * n); // cosN[i*n+j] = cos((2i+1)*j*π/(2n))
+                            for (let i = 0; i < n; i++) {
+                                cuArr[i] = i === 0 ? 1 / sqrt2 : 1;
+                                for (let j = 0; j < n; j++) {
+                                    cosN[i * n + j] = Math.cos((2 * i + 1) * j * Math.PI / (2 * n));
+                                }
+                            }
+                            const lut = { cosN, cuArr, n };
+                            _dctLUTCache[n] = lut;
+                            return lut;
+                        }
+
+                        function dct2d(matrix, n) {
+                            const lut = getDCTLUT(n);
+                            const result = new Float64Array(n * n);
+                            const { cosN, cuArr } = lut;
+                            const scale = 2 / n;
                             for (let u = 0; u < n; u++) {
+                                const cu = cuArr[u];
                                 for (let v = 0; v < n; v++) {
+                                    const cv = cuArr[v];
                                     let sum = 0;
-                                    const cu = u === 0 ? 1 / sqrt2 : 1;
-                                    const cv = v === 0 ? 1 / sqrt2 : 1;
                                     for (let x = 0; x < n; x++) {
-                                        const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
+                                        const cx = cosN[x * n + u];
+                                        const matRow = x * n;
                                         for (let y = 0; y < n; y++) {
-                                            const cosY = Math.cos((2 * y + 1) * v * Math.PI / (2 * n));
-                                            sum += matrix[x * n + y] * cosX * cosY;
+                                            sum += matrix[matRow + y] * cx * cosN[y * n + v];
                                         }
                                     }
-                                    result[u * n + v] = (2 / n) * cu * cv * sum;
+                                    result[u * n + v] = scale * cu * cv * sum;
                                 }
                             }
                             return result;
                         }
 
                         function idct2d(dctMatrix, n) {
+                            const lut = getDCTLUT(n);
                             const result = new Float64Array(n * n);
-                            const sqrt2 = Math.SQRT2;
+                            const { cosN, cuArr } = lut;
+                            const scale = 2 / n;
                             for (let x = 0; x < n; x++) {
                                 for (let y = 0; y < n; y++) {
                                     let sum = 0;
                                     for (let u = 0; u < n; u++) {
-                                        const cu = u === 0 ? 1 / sqrt2 : 1;
-                                        const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
+                                        const cu = cuArr[u];
+                                        const cx = cosN[x * n + u];
+                                        const dctRow = u * n;
                                         for (let v = 0; v < n; v++) {
-                                            const cv = v === 0 ? 1 / sqrt2 : 1;
-                                            const cosY = Math.cos((2 * y + 1) * v * Math.PI / (2 * n));
-                                            sum += cu * cv * dctMatrix[u * n + v] * cosX * cosY;
+                                            sum += cu * cuArr[v] * dctMatrix[dctRow + v] * cx * cosN[y * n + v];
                                         }
                                     }
-                                    result[x * n + y] = (2 / n) * sum;
+                                    result[x * n + y] = scale * sum;
                                 }
                             }
                             return result;
@@ -1924,11 +1995,11 @@
                         function extractYBlock(data, width, startX, startY, blockSize) {
                             const block = new Float64Array(blockSize * blockSize);
                             for (let i = 0; i < blockSize; i++) {
+                                const rowBase = ((startY + i) * width + startX) * 4;
+                                const blockRow = i * blockSize;
                                 for (let j = 0; j < blockSize; j++) {
-                                    const px = startX + i;
-                                    const py = startY + j;
-                                    const idx = (py * width + px) * 4;
-                                    block[i * blockSize + j] = 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
+                                    const idx = rowBase + j * 4;
+                                    block[blockRow + j] = 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
                                 }
                             }
                             return block;
@@ -1936,16 +2007,19 @@
 
                         function writeYBlock(data, width, startX, startY, block, blockSize) {
                             for (let i = 0; i < blockSize; i++) {
+                                const rowBase = ((startY + i) * width + startX) * 4;
+                                const blockRow = i * blockSize;
                                 for (let j = 0; j < blockSize; j++) {
-                                    const px = startX + i;
-                                    const py = startY + j;
-                                    const idx = (py * width + px) * 4;
+                                    const idx = rowBase + j * 4;
                                     const oldY = 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
-                                    const newY = block[i * blockSize + j];
+                                    const newY = block[blockRow + j];
                                     const delta = newY - oldY;
-                                    data[idx] = Math.max(0, Math.min(255, data[idx] + delta));
-                                    data[idx+1] = Math.max(0, Math.min(255, data[idx+1] + delta * 0.85));
-                                    data[idx+2] = Math.max(0, Math.min(255, data[idx+2] + delta * 0.65));
+                                    let r = data[idx] + delta;
+                                    let g = data[idx+1] + delta * 0.85;
+                                    let b = data[idx+2] + delta * 0.65;
+                                    data[idx] = r < 0 ? 0 : (r > 255 ? 255 : r);
+                                    data[idx+1] = g < 0 ? 0 : (g > 255 ? 255 : g);
+                                    data[idx+2] = b < 0 ? 0 : (b > 255 ? 255 : b);
                                 }
                             }
                         }
@@ -2051,19 +2125,23 @@
                                 }
                             }
 
+                            // 优化: 只计算RGB通道 (跳过alpha), 步长4
                             const len = originalData.length;
-                            let mse = 0, mseReported = 0;
+                            let mse = 0, mseCount = 0, mseReported = 0;
                             const mseChunk = Math.max(1, Math.floor(len / 200));
-                            for (let i=0; i<len; i++) {
-                                const diff = originalData[i] - imageData[i];
-                                mse += diff * diff;
+                            for (let i=0; i<len; i+=4) {
+                                const dr = originalData[i] - imageData[i];
+                                const dg = originalData[i+1] - imageData[i+1];
+                                const db = originalData[i+2] - imageData[i+2];
+                                mse += dr*dr + dg*dg + db*db;
+                                mseCount += 3;
                                 if (i - mseReported >= mseChunk) {
                                     mseReported = i;
                                     const msePct = 90 + Math.round((i / len) * 10);
                                     self.postMessage({ type: 'progress', pct: msePct, msg: '校验中...' });
                                 }
                             }
-                            mse /= len;
+                            mse /= mseCount;
                             const psnr = mse === 0 ? Infinity : 10 * Math.log10((255*255)/mse);
                             return { imageData, psnr, embeddedBits: bitsToEmbed.length };
                         }
@@ -2217,18 +2295,22 @@
                     }
                 }
 
+                // 优化: 只计算RGB通道 (跳过alpha), 步长4
                 const len = imageData.data.length;
-                let mse = 0;
-                const mseChunk = Math.max(1, Math.floor(len / 200));
-                for (let i = 0; i < len; i++) {
-                    const diff = imageData.data[i] - data[i];
-                    mse += diff * diff;
+                let mse = 0, mseCount = 0;
+                const mseChunk = Math.max(4, Math.floor(len / 200));
+                for (let i = 0; i < len; i += 4) {
+                    const dr = imageData.data[i] - data[i];
+                    const dg = imageData.data[i + 1] - data[i + 1];
+                    const db = imageData.data[i + 2] - data[i + 2];
+                    mse += dr * dr + dg * dg + db * db;
+                    mseCount += 3;
                     if (i % mseChunk === 0 && progressCb) {
                         const msePct = 90 + Math.round((i / len) * 10);
                         progressCb(msePct, '校验中...');
                     }
                 }
-                mse /= len;
+                mse /= mseCount;
                 const result = new ImageData(data, width, height);
                 const psnr = mse === 0 ? Infinity : 10 * Math.log10((255 * 255) / mse);
                 return { imageData: result, psnr, embeddedBits: bitsToEmbed.length };
@@ -2238,44 +2320,68 @@
                 return new Promise((resolve) => { resolve(); });
             }
 
-            // 工具函数 (与原来一致)
-            function dct2d(matrix, n) {
-                const result = new Float64Array(n * n);
+            // ============ 工具函数 (优化版: 预计算余弦LUT + 批量像素操作) ============
+            // 预计算 n×n 余弦矩阵: cosN[i][j] = cos((2*i+1)*j*π/(2n))
+            // cu[i] = i===0 ? 1/√2 : 1
+            const _mainDCTLUTCache = {};
+            function getMainDCTLUT(n) {
+                if (_mainDCTLUTCache[n]) return _mainDCTLUTCache[n];
                 const sqrt2 = Math.SQRT2;
+                const cuArr = new Float64Array(n);
+                const cosN = new Float64Array(n * n);
+                for (let i = 0; i < n; i++) {
+                    cuArr[i] = i === 0 ? 1 / sqrt2 : 1;
+                    for (let j = 0; j < n; j++) {
+                        cosN[i * n + j] = Math.cos((2 * i + 1) * j * Math.PI / (2 * n));
+                    }
+                }
+                const lut = { cosN, cuArr, n };
+                _mainDCTLUTCache[n] = lut;
+                return lut;
+            }
+
+            // 2D DCT: F(u,v) = (2/n)*cu(u)*cu(v)*ΣxΣy f(x,y)*cos((2x+1)uπ/2n)*cos((2y+1)vπ/2n)
+            function dct2d(matrix, n) {
+                const lut = getMainDCTLUT(n);
+                const result = new Float64Array(n * n);
+                const { cosN, cuArr } = lut;
+                const scale = 2 / n;
                 for (let u = 0; u < n; u++) {
+                    const cu = cuArr[u];
                     for (let v = 0; v < n; v++) {
+                        const cv = cuArr[v];
                         let sum = 0;
-                        const cu = u === 0 ? 1 / sqrt2 : 1;
-                        const cv = v === 0 ? 1 / sqrt2 : 1;
                         for (let x = 0; x < n; x++) {
-                            const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
+                            const cx = cosN[x * n + u];
+                            const mRow = x * n;
                             for (let y = 0; y < n; y++) {
-                                const cosY = Math.cos((2 * y + 1) * v * Math.PI / (2 * n));
-                                sum += matrix[x * n + y] * cosX * cosY;
+                                sum += matrix[mRow + y] * cx * cosN[y * n + v];
                             }
                         }
-                        result[u * n + v] = (2 / n) * cu * cv * sum;
+                        result[u * n + v] = scale * cu * cv * sum;
                     }
                 }
                 return result;
             }
 
+            // 2D IDCT: f(x,y) = (2/n)*ΣuΣv cu(u)*cu(v)*F(u,v)*cos((2x+1)uπ/2n)*cos((2y+1)vπ/2n)
             function idct2d(dctMatrix, n) {
+                const lut = getMainDCTLUT(n);
                 const result = new Float64Array(n * n);
-                const sqrt2 = Math.SQRT2;
+                const { cosN, cuArr } = lut;
+                const scale = 2 / n;
                 for (let x = 0; x < n; x++) {
                     for (let y = 0; y < n; y++) {
                         let sum = 0;
                         for (let u = 0; u < n; u++) {
-                            const cu = u === 0 ? 1 / sqrt2 : 1;
-                            const cosX = Math.cos((2 * x + 1) * u * Math.PI / (2 * n));
+                            const cu = cuArr[u];
+                            const cx = cosN[x * n + u];
+                            const dRow = u * n;
                             for (let v = 0; v < n; v++) {
-                                const cv = v === 0 ? 1 / sqrt2 : 1;
-                                const cosY = Math.cos((2 * y + 1) * v * Math.PI / (2 * n));
-                                sum += cu * cv * dctMatrix[u * n + v] * cosX * cosY;
+                                sum += cu * cuArr[v] * dctMatrix[dRow + v] * cx * cosN[y * n + v];
                             }
                         }
-                        result[x * n + y] = (2 / n) * sum;
+                        result[x * n + y] = scale * sum;
                     }
                 }
                 return result;
@@ -2284,11 +2390,11 @@
             function extractYBlock(data, width, startX, startY, blockSize) {
                 const block = new Float64Array(blockSize * blockSize);
                 for (let i = 0; i < blockSize; i++) {
+                    const rowBase = ((startY + i) * width + startX) * 4;
+                    const blockRow = i * blockSize;
                     for (let j = 0; j < blockSize; j++) {
-                        const px = startX + i;
-                        const py = startY + j;
-                        const idx = (py * width + px) * 4;
-                        block[i * blockSize + j] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+                        const idx = rowBase + j * 4;
+                        block[blockRow + j] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
                     }
                 }
                 return block;
@@ -2296,16 +2402,19 @@
 
             function writeYBlock(data, width, startX, startY, block, blockSize) {
                 for (let i = 0; i < blockSize; i++) {
+                    const rowBase = ((startY + i) * width + startX) * 4;
+                    const blockRow = i * blockSize;
                     for (let j = 0; j < blockSize; j++) {
-                        const px = startX + i;
-                        const py = startY + j;
-                        const idx = (py * width + px) * 4;
+                        const idx = rowBase + j * 4;
                         const oldY = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-                        const newY = block[i * blockSize + j];
+                        const newY = block[blockRow + j];
                         const delta = newY - oldY;
-                        data[idx] = Math.max(0, Math.min(255, data[idx] + delta));
-                        data[idx + 1] = Math.max(0, Math.min(255, data[idx + 1] + delta * 0.85));
-                        data[idx + 2] = Math.max(0, Math.min(255, data[idx + 2] + delta * 0.65));
+                        let r = data[idx] + delta;
+                        let g = data[idx + 1] + delta * 0.85;
+                        let b = data[idx + 2] + delta * 0.65;
+                        data[idx] = r < 0 ? 0 : (r > 255 ? 255 : r);
+                        data[idx + 1] = g < 0 ? 0 : (g > 255 ? 255 : g);
+                        data[idx + 2] = b < 0 ? 0 : (b > 255 ? 255 : b);
                     }
                 }
             }
@@ -3157,39 +3266,90 @@
                 }
             }
 
-            async function uploadFiles(files) {
+            // ============ 修复后的上传逻辑 ============
+            let pendingUploadFiles = [];
+            let uploadRetryCount = 0;
+            const MAX_UPLOAD_RETRIES = 3;
+
+            async function uploadFiles(files, retry = false) {
                 if (isUploading) return;
-                if (!files || files.length === 0) return;
+                if (!files || files.length === 0) {
+                    // 如果有待重试的文件，尝试重试
+                    if (failedUploads.length > 0 && !retry) {
+                        await retryFailedUploads();
+                    }
+                    return;
+                }
+
+                // 过滤掉已经成功上传的文件（通过文件名和大小比对）
+                const existingNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
+                const newFiles = [];
+                for (const f of files) {
+                    const key = f.name + '_' + f.size;
+                    if (!existingNames.has(key)) {
+                        newFiles.push(f);
+                    } else {
+                        console.log('跳过已存在的文件:', f.name);
+                    }
+                }
+
+                if (newFiles.length === 0) {
+                    setStatus('⚠️ 所有文件已存在，无需重复上传', true);
+                    // 重置 input
+                    hiddenFileInput.value = '';
+                    return;
+                }
+
                 isUploading = true;
                 uploadProgress.classList.add('active');
-                const total = files.length;
+                const total = newFiles.length;
                 let completed = 0,
                     failed = 0;
+                const failedList = [];
+
                 uploadBar.style.width = '0%';
                 uploadText.textContent = `准备上传 ${total} 个文件...`;
+
                 for (let i = 0; i < total; i++) {
-                    const f = files[i];
+                    const f = newFiles[i];
                     const startPct = Math.round((i / total) * 100);
                     uploadBar.style.width = startPct + '%';
                     uploadText.textContent = `📖 读取中 ${i+1}/${total}: ${f.name}`;
+
                     try {
                         const isPDF = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
                         const isVideo = f.type.startsWith('video/');
+
                         if (isPDF) {
                             if (!pdfjsLib) throw new Error('PDF.js 未加载');
                             const arrayBuffer = await f.arrayBuffer();
                             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                             const totalPages = pdf.numPages;
                             uploadText.textContent = `📄 解析PDF: ${f.name} (${totalPages}页)`;
-                            await new Promise(r => setTimeout(r, 50));
+                            await new Promise(r => setTimeout(r, 30));
+
+                            let pdfSuccess = 0,
+                                pdfFailed = 0;
                             for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                                await addPDFPageItem(f, pageNum, pdf);
-                                completed++;
+                                try {
+                                    await addPDFPageItem(f, pageNum, pdf);
+                                    pdfSuccess++;
+                                } catch (pageErr) {
+                                    pdfFailed++;
+                                    console.error(`PDF第${pageNum}页加载失败:`, pageErr);
+                                    // 单页失败不中断整体
+                                }
                                 const donePct = Math.round(((i + 1) / total) * 100);
                                 uploadBar.style.width = donePct + '%';
                                 uploadText.textContent =
-                                    `✅ ${i+1}/${total}: ${f.name} 第${pageNum}/${totalPages}页`;
-                                await new Promise(r => setTimeout(r, 20));
+                                    `📄 ${i+1}/${total}: ${f.name} 第${pageNum}/${totalPages}页 (成功${pdfSuccess}页)`;
+                                await new Promise(r => setTimeout(r, 10));
+                            }
+                            if (pdfSuccess > 0) {
+                                completed++;
+                            } else {
+                                failed++;
+                                failedList.push(f.name);
                             }
                         } else if (isVideo || f.type.startsWith('image/')) {
                             await addBatchItem(f);
@@ -3200,23 +3360,34 @@
                         } else {
                             console.warn('跳过不支持的文件:', f.name);
                             failed++;
-                            continue;
+                            failedList.push(f.name);
                         }
                     } catch (err) {
                         failed++;
+                        failedList.push(f.name);
                         console.error('上传失败:', f.name, err);
-                        uploadText.textContent = `❌ ${i+1}/${total}: ${f.name} 失败`;
+                        uploadText.textContent = `❌ ${i+1}/${total}: ${f.name} 失败 - ${err.message || '未知错误'}`;
                         await new Promise(r => setTimeout(r, 200));
                     }
                 }
+
+                // 更新失败列表
+                failedUploads = failedList.map(name => {
+                    // 找到对应的文件对象
+                    const file = newFiles.find(f => f.name === name);
+                    return { name, file, retries: 0 };
+                }).filter(item => item.file);
+
                 uploadBar.style.width = '100%';
                 uploadText.textContent = failed === 0 ? `✅ 全部完成! 共 ${completed} 个文件` :
                     `⚠️ 完成 ${completed} 个, ${failed} 个失败`;
+
                 setTimeout(() => {
                     uploadProgress.classList.remove('active');
                     uploadBar.style.width = '0%';
                     isUploading = false;
                 }, 1200);
+
                 if (completed > 0) {
                     setStatus(`✅ 已添加 ${completed} 个文件${failed > 0 ? `, ${failed} 个失败` : ''}`);
                     if (!selectedId && batchItems.length > 0) {
@@ -3225,11 +3396,80 @@
                     }
                     renderThumbnails();
                 } else if (failed > 0 && completed === 0) {
-                    setStatus(`⚠️ 所有文件上传失败`, false);
+                    setStatus(`⚠️ 所有文件上传失败，点击"重试失败"按钮重新尝试`, false);
                 }
-                setTimeout(() => { hiddenFileInput.value = ''; }, 100);
+
+                // 更新重试按钮状态
+                updateRetryButtonVisibility();
+
+                // 重置 input（重要：确保下次选择文件能触发 change 事件）
+                hiddenFileInput.value = '';
             }
 
+            // ============ 重试失败上传 ============
+            async function retryFailedUploads() {
+                if (isUploading) {
+                    setStatus('⏳ 正在上传中，请稍候...', true);
+                    return;
+                }
+
+                if (failedUploads.length === 0) {
+                    setStatus('✅ 没有需要重试的文件', true);
+                    updateRetryButtonVisibility();
+                    return;
+                }
+
+                // 过滤掉已经成功添加的文件（防止重复）
+                const existingNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
+                const toRetry = failedUploads.filter(item => {
+                    const key = item.file.name + '_' + item.file.size;
+                    return !existingNames.has(key);
+                });
+
+                if (toRetry.length === 0) {
+                    setStatus('✅ 所有失败文件已存在，无需重试', true);
+                    failedUploads = [];
+                    updateRetryButtonVisibility();
+                    return;
+                }
+
+                // 检查重试次数
+                const canRetry = toRetry.filter(item => item.retries < MAX_UPLOAD_RETRIES);
+                if (canRetry.length === 0) {
+                    setStatus(`⚠️ 重试次数已达上限 (${MAX_UPLOAD_RETRIES}次)，请刷新页面后重试`, false);
+                    return;
+                }
+
+                setStatus(`🔄 正在重试 ${canRetry.length} 个失败文件...`, true);
+                const filesToUpload = canRetry.map(item => item.file);
+
+                // 增加重试计数
+                canRetry.forEach(item => item.retries++);
+
+                // 重新上传
+                await uploadFiles(filesToUpload, true);
+
+                // 清理已成功重试的文件
+                const successNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
+                failedUploads = failedUploads.filter(item => {
+                    const key = item.file.name + '_' + item.file.size;
+                    return !successNames.has(key);
+                });
+
+                updateRetryButtonVisibility();
+            }
+
+            // ============ 更新重试按钮可见性 ============
+            function updateRetryButtonVisibility() {
+                if (failedUploads.length > 0) {
+                    retryUploadBtn.classList.remove('hidden');
+                    retryUploadBtn.textContent = `🔄 重试失败 (${failedUploads.length})`;
+                } else {
+                    retryUploadBtn.classList.add('hidden');
+                }
+            }
+
+            // ============ 缩略图渲染 (与原来一致) ============
             function renderThumbnails() {
                 const fragment = document.createDocumentFragment();
                 batchItems.forEach((item, index) => {
@@ -3286,6 +3526,8 @@
                 addDiv.innerHTML = `<span class="plus">+</span>`;
                 addDiv.title = '添加图片、PDF（自动拆分多页）或视频';
                 addDiv.addEventListener('click', function(e) { e.stopPropagation();
+                    // 重置 input 以确保能触发 change
+                    hiddenFileInput.value = '';
                     hiddenFileInput.click(); });
                 addDiv.addEventListener('dragover', function(e) { e.preventDefault();
                     this.style.borderColor = '#7c3aed';
@@ -3298,12 +3540,18 @@
                     this.style.borderColor = '#d5e2ef';
                     this.style.background = '#f8fafd';
                     const files = e.dataTransfer.files;
-                    if (files.length > 0) uploadFiles(files);
+                    if (files.length > 0) {
+                        // 重置 input
+                        hiddenFileInput.value = '';
+                        uploadFiles(files);
+                    }
                 });
                 fragment.appendChild(addDiv);
                 thumbnailGrid.innerHTML = '';
                 thumbnailGrid.appendChild(fragment);
                 updateStats();
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
             }
 
             async function reloadPDFPage(itemId, newPage) {
@@ -3502,8 +3750,9 @@
                 renderThumbnails();
                 updateStats();
                 updateRegenerateMode();
-                // 清除续传记录
                 resumeState.items = resumeState.items.filter(i => i.id !== id);
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
             }
 
             function clearBatch() {
@@ -3516,6 +3765,7 @@
                 resumeState.completed = 0;
                 resumeState.failed = 0;
                 resumeState.inProgress = false;
+                failedUploads = [];
                 clearPreview();
                 renderThumbnails();
                 updateStats();
@@ -3527,6 +3777,9 @@
                 blockCheckBadge.textContent = '⏳ 检测中';
                 blockCheckBadge.className = 'block-check-badge';
                 processingOverlay.classList.remove('active');
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
+                hiddenFileInput.value = '';
             }
 
             function getSelectedItems() { return batchItems.filter(i => i.selected); }
@@ -3536,15 +3789,19 @@
                 batchCount.textContent = batchItems.length;
                 selectedCountBadge.textContent = `已选: ${selected.length}`;
                 updateRegenerateMode();
-                // 更新续传状态
                 const pending = batchItems.filter(i => !i.processed && !i.failed);
                 if (pending.length > 0 && !resumeState.inProgress) {
                     resumeStatus.textContent = `⏸️ 待处理: ${pending.length}`;
+                    resumePendingBadge.textContent = `⏳ 待续传 ${pending.length}`;
                 } else if (resumeState.inProgress) {
                     resumeStatus.textContent = `⏳ 续传中 ${resumeState.completed}/${resumeState.total}`;
+                    resumePendingBadge.textContent = `⏳ 续传中 ${resumeState.completed}/${resumeState.total}`;
                 } else {
                     resumeStatus.textContent = '⏸️ 续传就绪';
+                    resumePendingBadge.textContent = '✅ 无需续传';
                 }
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
             }
 
             function clearPreview() {
@@ -3583,6 +3840,22 @@
                 } else {
                     regenerateMode.textContent = '未选';
                     regenerateMode.style.color = '#999';
+                }
+            }
+
+            function updateResumeButtonVisibility() {
+                const pending = batchItems.filter(i => !i.processed && !i.failed);
+                if (pending.length > 0 && !resumeState.inProgress) {
+                    resumeBatchBtn.classList.remove('hidden');
+                    resumeBadgeWrap.classList.remove('hidden');
+                    resumePendingBadge.textContent = `⏳ 待续传 ${pending.length}`;
+                } else if (resumeState.inProgress) {
+                    resumeBatchBtn.classList.remove('hidden');
+                    resumeBadgeWrap.classList.remove('hidden');
+                    resumePendingBadge.textContent = `⏳ 续传中 ${resumeState.completed}/${resumeState.total}`;
+                } else {
+                    resumeBatchBtn.classList.add('hidden');
+                    resumeBadgeWrap.classList.add('hidden');
                 }
             }
 
@@ -3643,8 +3916,8 @@
                     `⚠️ 批量重算完成: 成功 ${success} 个, 失败 ${failed} 个`, failed === 0, 'warning');
                 renderThumbnails();
                 updateRegenerateMode();
-                // 更新续传状态
                 updateStats();
+                updateResumeButtonVisibility();
             }
 
             async function regenerateWatermark() {
@@ -3695,6 +3968,7 @@
                 }
                 updateRegenerateMode();
                 updateStats();
+                updateResumeButtonVisibility();
             }
 
             // ============ 提取 (与原来一致) ============
@@ -4089,6 +4363,7 @@
                 if (failed > 0) setStatus(`⚠️ 批量处理完成，${failed} 个失败，请检查控制台`, false, 'warning');
                 renderThumbnails();
                 updateStats();
+                updateResumeButtonVisibility();
             }
 
             function processBatch() {
@@ -4105,14 +4380,13 @@
                     setStatus('⏳ 续传已在运行中', true);
                     return;
                 }
-                // 收集所有未处理且未失败的项目 (优先处理未完成的)
                 const pending = batchItems.filter(i => !i.processed && !i.failed);
                 if (pending.length === 0) {
                     setStatus('✅ 所有项目均已处理完成，无需续传', true);
+                    updateResumeButtonVisibility();
                     return;
                 }
 
-                // 构建续传任务列表
                 const tasks = pending.map(item => ({
                     id: item.id,
                     item: item,
@@ -4128,8 +4402,8 @@
 
                 resumeStatus.textContent = `⏳ 续传中 0/${resumeState.total}`;
                 setStatusLoading(`⏳ 续传开始，共 ${resumeState.total} 个待处理项...`);
+                updateResumeButtonVisibility();
 
-                // 显示进度
                 batchProgress.classList.remove('hidden');
                 batchBar.style.width = '0%';
                 batchProgressText.textContent = '0%';
@@ -4159,16 +4433,15 @@
                     batchStatusDetail.innerHTML = `🔄 ${progressMsg}`;
                     resumeStatus.textContent = `⏳ 续传中 ${i+1}/${tasks.length}`;
                     setStatusLoading(`⏳ ${progressMsg}`);
+                    updateResumeButtonVisibility();
 
                     try {
-                        // 调用重新生成
                         await regenerateSingle(item, (p, msg) => {
                             batchStatusDetail.innerHTML =
                             `🔄 ${item.name} ${Math.round(p)}%: ${msg || ''}`;
                         });
                         successCount++;
                         resumeState.completed++;
-                        // 更新缩略图
                         renderThumbnails();
                         if (currentItemId === item.id) {
                             refreshPreview(item, true);
@@ -4193,7 +4466,6 @@
                     await new Promise(r => setTimeout(r, 50));
                 }
 
-                // 完成
                 const totalDone = successCount + failCount;
                 batchBar.style.width = '100%';
                 batchProgressText.textContent = '100%';
@@ -4217,14 +4489,15 @@
                 resumeState.inProgress = false;
                 renderThumbnails();
                 updateStats();
+                updateResumeButtonVisibility();
             }
 
-            // 取消续传 (通过清空或重置时自动取消)
             function cancelResume() {
                 if (resumeState.inProgress) {
                     resumeState.cancelled = true;
                     resumeState.inProgress = false;
                     setStatus('⏸️ 续传已取消', true);
+                    updateResumeButtonVisibility();
                 }
             }
 
@@ -4361,6 +4634,9 @@
                 resumeState.completed = 0;
                 resumeState.failed = 0;
                 resumeStatus.textContent = '⏸️ 续传就绪';
+                failedUploads = [];
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
             }
 
             // ============ 事件绑定 ============
@@ -4372,12 +4648,28 @@
                 e.preventDefault();
                 this.classList.remove('dragover');
                 const files = e.dataTransfer.files;
-                if (files.length > 0) uploadFiles(files);
+                if (files.length > 0) {
+                    hiddenFileInput.value = '';
+                    uploadFiles(files);
+                }
             });
+
+            // 修复文件输入框的 change 事件 - 每次都能触发
             hiddenFileInput.addEventListener('change', function(e) {
                 const files = e.target.files;
-                if (files && files.length > 0) uploadFiles(files);
-                setTimeout(() => { hiddenFileInput.value = ''; }, 100);
+                if (files && files.length > 0) {
+                    uploadFiles(files);
+                }
+                // 重要：立即重置 value，确保下次选择相同文件也能触发 change
+                // 但需要延迟重置，避免影响当前上传
+                setTimeout(() => {
+                    hiddenFileInput.value = '';
+                }, 100);
+            });
+
+            // 重试按钮
+            retryUploadBtn.addEventListener('click', function() {
+                retryFailedUploads();
             });
 
             const colorChangeHandler = () => {
@@ -4505,8 +4797,8 @@
                 updateColorPreview();
                 renderThumbnails();
                 updateRegenerateMode();
-                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 断点续传');
-                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动 · 断点续传已集成');
+                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传');
+                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动 · 智能续传已集成 · 上传修复');
                 initWorker();
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载');
@@ -4524,6 +4816,11 @@
                 blockCheckBadge.textContent = '⏳ 请选择内容';
                 blockCheckBadge.className = 'block-check-badge';
                 resumeStatus.textContent = '⏸️ 续传就绪';
+                updateResumeButtonVisibility();
+                updateRetryButtonVisibility();
+
+                // 清理 input
+                hiddenFileInput.value = '';
             }
 
             function ensureLongPressSave() {
