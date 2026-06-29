@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>频域隐式水印 · 多块大小 · Worker加速 · 视频水印</title>
+    <title>频域隐式水印 · 多块大小 · Worker加速 · 视频水印 · 断点续传</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
@@ -11,7 +11,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
     </script>
     <style>
-        /* === 样式与原来保持一致 === */
+        /* === 样式与原来保持一致 + 新增断点续传相关样式 === */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -115,6 +115,16 @@
             font-weight: 700;
             margin-left: 4px;
             animation: pulse 2.5s infinite;
+        }
+        .badge-resume {
+            background: #0d9488;
+            color: white;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            margin-left: 4px;
+            animation: pulse 1.8s infinite;
         }
         @keyframes pulse {
             0%,
@@ -471,6 +481,15 @@
             background: #be123c;
             border-color: #be123c;
         }
+        .btn-resume {
+            background: #0d9488;
+            border-color: #0d9488;
+            color: white;
+        }
+        .btn-resume:hover {
+            background: #0f766e;
+            border-color: #0f766e;
+        }
         .file-input-wrap {
             display: none;
         }
@@ -715,6 +734,9 @@
         }
         .thumb-item .thumb-status.video {
             background: rgba(225, 29, 72, 0.85);
+        }
+        .thumb-item .thumb-status.resumed {
+            background: rgba(13, 148, 136, 0.85);
         }
         .thumb-item .thumb-checkbox {
             position: absolute;
@@ -1425,6 +1447,19 @@
             font-size: 0.7rem;
             background: white;
         }
+        /* 断点续传相关 */
+        .resume-info {
+            font-size: 0.6rem;
+            background: #ccfbf1;
+            color: #0f766e;
+            padding: 2px 10px;
+            border-radius: 30px;
+            border: 1px solid #99f6e4;
+        }
+        .btn-resume:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -1439,9 +1474,10 @@
             <span class="badge-pdf-export">📤 PDF导出</span>
             <span class="badge-worker">⚡ Worker</span>
             <span class="badge-video">🎬 视频水印</span>
+            <span class="badge-resume">⏳ 断点续传</span>
         </h1>
         <div class="sub">
-            <span>⚡ 8种块大小 · 逐个勾选 · 批量打包下载 · 导出PDF · Worker加速 · 视频水印 · 多种编码</span>
+            <span>⚡ 8种块大小 · 逐个勾选 · 批量打包下载 · 导出PDF · Worker加速 · 视频水印 · 多种编码 · 断点续传</span>
             <span class="stats" id="algoStats">DCT · 三频嵌入 · RS纠错 · PDF支持 · Web Worker · H.264/H.265/AV1/VP9</span>
         </div>
 
@@ -1457,6 +1493,7 @@
                             <button class="btn btn-outline btn-sm" id="selectAllBtn" style="flex:0 1 auto;">全选</button>
                             <button class="btn btn-outline btn-sm" id="deselectAllBtn" style="flex:0 1 auto;">取消</button>
                             <span class="worker-status" id="workerStatus">⚡ Worker 就绪</span>
+                            <span class="resume-info" id="resumeStatus">⏸️ 续传就绪</span>
                         </div>
                         <div class="batch-info">
                             <span class="format-hint">PNG/MP4</span>
@@ -1680,6 +1717,9 @@
                         🔄 重新生成水印
                     </button>
                     <span class="regenerate-hint" id="regenerateMode">单张</span>
+                    <button class="btn btn-resume btn-sm" id="resumeBatchBtn" style="flex:0 1 auto;">
+                        ⏩ 续传
+                    </button>
                 </div>
 
                 <div class="footer-actions">
@@ -1692,7 +1732,7 @@
                 </div>
 
                 <div class="status-msg" id="statusMsg">
-                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速
+                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 断点续传
                 </div>
             </div>
         </div>
@@ -1749,6 +1789,7 @@
             const overlayText = document.getElementById('overlayText');
             const overlaySub = document.getElementById('overlaySub');
             const workerStatus = document.getElementById('workerStatus');
+            const resumeStatus = document.getElementById('resumeStatus');
 
             const preDownloadProgress = document.getElementById('preDownloadProgress');
             const preFill = document.getElementById('preFill');
@@ -1803,6 +1844,7 @@
             const regenerateBtn = document.getElementById('regenerateBtn');
             const pdfExportBtn = document.getElementById('pdfExportBtn');
             const videoExportBtn = document.getElementById('videoExportBtn');
+            const resumeBatchBtn = document.getElementById('resumeBatchBtn');
 
             // ============ 状态 ============
             let batchItems = [];
@@ -1817,8 +1859,18 @@
             let paramsChanged = false;
             let currentParams = {};
             let pdfCache = {};
+            // 断点续传状态
+            let resumeState = {
+                inProgress: false,
+                total: 0,
+                completed: 0,
+                failed: 0,
+                items: [],
+                results: [],
+                cancelled: false
+            };
 
-            // ============ Web Worker 封装 ============
+            // ============ Web Worker 封装 (与原来一致) ============
             let worker = null;
             let workerReady = false;
             let workerCallbacks = {};
@@ -2186,7 +2238,7 @@
                 return new Promise((resolve) => { resolve(); });
             }
 
-            // 工具函数
+            // 工具函数 (与原来一致)
             function dct2d(matrix, n) {
                 const result = new Float64Array(n * n);
                 const sqrt2 = Math.SQRT2;
@@ -2362,7 +2414,7 @@
                 return chars.join('');
             }
 
-            // ============ 视频处理 ============
+            // ============ 视频处理 (与原来一致) ============
             async function extractVideoFrames(videoFile, maxFrames = 120) {
                 return new Promise((resolve, reject) => {
                     const video = document.createElement('video');
@@ -2562,7 +2614,7 @@
                 };
             }
 
-            // ============ 主线程回退实现 ============
+            // ============ 主线程回退实现 (与原来一致) ============
             async function regenerateSingleWorker(item, progressCb) {
                 if (!item) return null;
 
@@ -2578,7 +2630,6 @@
                         item.videoFrames = result.frames;
                         item.totalFrames = result.totalFrames;
                         item._cacheKey = `${msgInput.value}|${keyInput.value}|${strengthRange.value}|${blockSizeSelect.value}|${errorCorrectionSelect.value}|${midFreqSelect.value}|${embedStrategySelect.value}`;
-                        // 保存原始视频URL供预览
                         if (result.originalVideoElement) {
                             item.originalVideoUrl = URL.createObjectURL(item.file);
                         }
@@ -2682,7 +2733,7 @@
                 }
             }
 
-            // ============ 辅助函数 ============
+            // ============ 辅助函数 (与原来一致) ============
             function updateColorPreview() {
                 const color = watermarkColorInput.value;
                 colorPreview.style.background = color;
@@ -2874,14 +2925,12 @@
                 if (item.isVideo) {
                     displayImg.style.display = 'none';
                     displayVideo.style.display = 'block';
-                    // 优先显示原始视频用于预览（未处理时）
                     if (item.watermarkedVideoBlob) {
                         const url = URL.createObjectURL(item.watermarkedVideoBlob);
                         displayVideo.src = url;
                         displayVideo.className = 'loaded';
                         displayVideo.load();
                     } else if (item.originalVideoUrl || item.file) {
-                        // 显示原始视频
                         const url = item.originalVideoUrl || URL.createObjectURL(item.file);
                         if (!item.originalVideoUrl) {
                             item.originalVideoUrl = url;
@@ -2916,7 +2965,7 @@
                 return canvas;
             }
 
-            // ============ 缩略图相关 ============
+            // ============ 缩略图相关 (与原来一致) ============
             function addBatchItem(file) {
                 return new Promise((resolve, reject) => {
                     if (file.type.startsWith('video/')) {
@@ -2971,7 +3020,6 @@
                                     };
                                     batchItems.push(item);
                                     renderThumbnails();
-                                    // 不要撤销URL，保留用于预览
                                     resolve(item);
                                 };
                                 video.onseeked();
@@ -3330,7 +3378,6 @@
                 if (item.isVideo) {
                     displayImg.style.display = 'none';
                     displayVideo.style.display = 'block';
-                    // 使用保存的原始视频URL
                     if (item.originalVideoUrl) {
                         displayVideo.src = item.originalVideoUrl;
                         displayVideo.className = 'loaded';
@@ -3455,6 +3502,8 @@
                 renderThumbnails();
                 updateStats();
                 updateRegenerateMode();
+                // 清除续传记录
+                resumeState.items = resumeState.items.filter(i => i.id !== id);
             }
 
             function clearBatch() {
@@ -3463,6 +3512,10 @@
                 originalImageDataCache = {};
                 isShowingWatermarked = {};
                 pdfCache = {};
+                resumeState.items = [];
+                resumeState.completed = 0;
+                resumeState.failed = 0;
+                resumeState.inProgress = false;
                 clearPreview();
                 renderThumbnails();
                 updateStats();
@@ -3483,6 +3536,15 @@
                 batchCount.textContent = batchItems.length;
                 selectedCountBadge.textContent = `已选: ${selected.length}`;
                 updateRegenerateMode();
+                // 更新续传状态
+                const pending = batchItems.filter(i => !i.processed && !i.failed);
+                if (pending.length > 0 && !resumeState.inProgress) {
+                    resumeStatus.textContent = `⏸️ 待处理: ${pending.length}`;
+                } else if (resumeState.inProgress) {
+                    resumeStatus.textContent = `⏳ 续传中 ${resumeState.completed}/${resumeState.total}`;
+                } else {
+                    resumeStatus.textContent = '⏸️ 续传就绪';
+                }
             }
 
             function clearPreview() {
@@ -3524,7 +3586,7 @@
                 }
             }
 
-            // ============ 重新生成 ============
+            // ============ 重新生成 (与原来一致) ============
             async function regenerateSingle(item, progressCb) {
                 return regenerateSingleWorker(item, progressCb);
             }
@@ -3581,6 +3643,8 @@
                     `⚠️ 批量重算完成: 成功 ${success} 个, 失败 ${failed} 个`, failed === 0, 'warning');
                 renderThumbnails();
                 updateRegenerateMode();
+                // 更新续传状态
+                updateStats();
             }
 
             async function regenerateWatermark() {
@@ -3630,9 +3694,10 @@
                     regenerateBtn.textContent = '🔄 重新生成水印';
                 }
                 updateRegenerateMode();
+                updateStats();
             }
 
-            // ============ 提取 ============
+            // ============ 提取 (与原来一致) ============
             function performExtract(silent = false) {
                 if (!currentItemId) { if (!silent) setStatus('⚠️ 请先选择一张图片', false); return; }
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -3698,7 +3763,7 @@
                 }
             }
 
-            // ============ 下载 ============
+            // ============ 下载 (与原来一致) ============
             function downloadSingleDirect(item) {
                 try {
                     if (item.isVideo) {
@@ -4023,6 +4088,7 @@
                 setStatus(`✅ 批量处理完成! 成功: ${processed}, 失败: ${failed}`, true);
                 if (failed > 0) setStatus(`⚠️ 批量处理完成，${failed} 个失败，请检查控制台`, false, 'warning');
                 renderThumbnails();
+                updateStats();
             }
 
             function processBatch() {
@@ -4033,7 +4099,136 @@
                 checkAndDownload('batch', selected);
             }
 
-            // ============ PDF导出 ============
+            // ============ 断点续传核心逻辑 ============
+            async function resumeBatchProcessing() {
+                if (resumeState.inProgress) {
+                    setStatus('⏳ 续传已在运行中', true);
+                    return;
+                }
+                // 收集所有未处理且未失败的项目 (优先处理未完成的)
+                const pending = batchItems.filter(i => !i.processed && !i.failed);
+                if (pending.length === 0) {
+                    setStatus('✅ 所有项目均已处理完成，无需续传', true);
+                    return;
+                }
+
+                // 构建续传任务列表
+                const tasks = pending.map(item => ({
+                    id: item.id,
+                    item: item,
+                    status: 'pending'
+                }));
+
+                resumeState.inProgress = true;
+                resumeState.total = tasks.length;
+                resumeState.completed = 0;
+                resumeState.failed = 0;
+                resumeState.items = tasks;
+                resumeState.cancelled = false;
+
+                resumeStatus.textContent = `⏳ 续传中 0/${resumeState.total}`;
+                setStatusLoading(`⏳ 续传开始，共 ${resumeState.total} 个待处理项...`);
+
+                // 显示进度
+                batchProgress.classList.remove('hidden');
+                batchBar.style.width = '0%';
+                batchProgressText.textContent = '0%';
+                batchDownloadProgress.classList.add('active');
+                batchDownloadFill.style.width = '0%';
+                batchPercent.textContent = '0%';
+                batchStatusDetail.innerHTML = `⏳ 续传中 0/${resumeState.total}`;
+                batchSpinner.className = 'mini-spinner';
+
+                let successCount = 0,
+                    failCount = 0;
+
+                for (let i = 0; i < tasks.length; i++) {
+                    if (resumeState.cancelled) {
+                        batchStatusDetail.innerHTML = `⏸️ 续传已取消 (已完成 ${successCount}/${i})`;
+                        break;
+                    }
+                    const task = tasks[i];
+                    const item = task.item;
+                    const pct = Math.round(((i + 1) / tasks.length) * 100);
+                    const progressMsg = `续传 ${i+1}/${tasks.length}: ${item.name}`;
+
+                    batchBar.style.width = pct + '%';
+                    batchProgressText.textContent = pct + '%';
+                    batchDownloadFill.style.width = pct + '%';
+                    batchPercent.textContent = pct + '%';
+                    batchStatusDetail.innerHTML = `🔄 ${progressMsg}`;
+                    resumeStatus.textContent = `⏳ 续传中 ${i+1}/${tasks.length}`;
+                    setStatusLoading(`⏳ ${progressMsg}`);
+
+                    try {
+                        // 调用重新生成
+                        await regenerateSingle(item, (p, msg) => {
+                            batchStatusDetail.innerHTML =
+                            `🔄 ${item.name} ${Math.round(p)}%: ${msg || ''}`;
+                        });
+                        successCount++;
+                        resumeState.completed++;
+                        // 更新缩略图
+                        renderThumbnails();
+                        if (currentItemId === item.id) {
+                            refreshPreview(item, true);
+                            if (!item.isVideo) {
+                                watermarkStatus.textContent = '✅ 已嵌入 (预览)';
+                                watermarkStatus.style.color = '#1d7a5e';
+                                if (item.psnr) psnrDisplay.textContent = `PSNR: ${item.psnr.toFixed(2)}dB`;
+                            } else {
+                                watermarkStatus.textContent = '✅ 已嵌入 (视频)';
+                                watermarkStatus.style.color = '#1d7a5e';
+                            }
+                        }
+                        batchStatusDetail.innerHTML = `✅ 完成: ${item.name}`;
+                    } catch (e) {
+                        failCount++;
+                        resumeState.failed++;
+                        item.failed = true;
+                        console.error(`❌ 续传失败 ${item.name}:`, e);
+                        batchStatusDetail.innerHTML =
+                        `❌ <span class="fail-icon">失败</span> ${item.name}: ${e.message}`;
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                }
+
+                // 完成
+                const totalDone = successCount + failCount;
+                batchBar.style.width = '100%';
+                batchProgressText.textContent = '100%';
+                batchDownloadFill.style.width = '100%';
+                batchPercent.textContent = '100%';
+                batchSpinner.className = 'mini-spinner done';
+                batchStatusDetail.innerHTML =
+                    `✅ 续传完成! 成功: ${successCount}, 失败: ${failCount}`;
+                resumeStatus.textContent = `✅ 续传完成 (成功${successCount}/${resumeState.total})`;
+                setStatus(`✅ 续传完成! 成功 ${successCount} 个，失败 ${failCount} 个`, failCount === 0, 'warning');
+
+                setTimeout(() => {
+                    batchDownloadProgress.classList.remove('active');
+                }, 4000);
+                setTimeout(() => {
+                    batchProgress.classList.add('hidden');
+                    batchBar.style.width = '0%';
+                    batchProgressText.textContent = '0%';
+                }, 500);
+
+                resumeState.inProgress = false;
+                renderThumbnails();
+                updateStats();
+            }
+
+            // 取消续传 (通过清空或重置时自动取消)
+            function cancelResume() {
+                if (resumeState.inProgress) {
+                    resumeState.cancelled = true;
+                    resumeState.inProgress = false;
+                    setStatus('⏸️ 续传已取消', true);
+                }
+            }
+
+            // ============ PDF导出 (与原来一致) ============
             function getPDFPageSize() {
                 const size = pdfPageSize.value;
                 const orientation = pdfOrientation.value;
@@ -4114,7 +4309,7 @@
                 }
             }
 
-            // ============ 导出视频 ============
+            // ============ 导出视频 (与原来一致) ============
             async function exportVideoDirect() {
                 if (!currentItemId) { setStatus('⚠️ 请先选择一个视频', false); return; }
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -4136,8 +4331,9 @@
                 setStatus(`✅ 视频导出成功: ${filename}`);
             }
 
-            // ============ 重置 ============
+            // ============ 重置 (与原来一致) ============
             function resetAll() {
+                cancelResume();
                 clearBatch();
                 clearPreview();
                 hiddenFileInput.value = '';
@@ -4159,6 +4355,12 @@
                 blockCheckBadge.textContent = '⏳ 检测中';
                 blockCheckBadge.className = 'block-check-badge';
                 processingOverlay.classList.remove('active');
+                resumeState.inProgress = false;
+                resumeState.cancelled = false;
+                resumeState.items = [];
+                resumeState.completed = 0;
+                resumeState.failed = 0;
+                resumeStatus.textContent = '⏸️ 续传就绪';
             }
 
             // ============ 事件绑定 ============
@@ -4249,8 +4451,9 @@
             clearBatchBtn.addEventListener('click', clearBatch);
             selectAllBtn.addEventListener('click', selectAllItems);
             deselectAllBtn.addEventListener('click', deselectAllItems);
+            resumeBatchBtn.addEventListener('click', resumeBatchProcessing);
 
-            // 放大
+            // 放大 (与原来一致)
             function openZoom() {
                 if (!currentItemId) return;
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -4302,8 +4505,8 @@
                 updateColorPreview();
                 renderThumbnails();
                 updateRegenerateMode();
-                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速');
-                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动');
+                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 断点续传');
+                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动 · 断点续传已集成');
                 initWorker();
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载');
@@ -4320,6 +4523,7 @@
                 }
                 blockCheckBadge.textContent = '⏳ 请选择内容';
                 blockCheckBadge.className = 'block-check-badge';
+                resumeStatus.textContent = '⏸️ 续传就绪';
             }
 
             function ensureLongPressSave() {
