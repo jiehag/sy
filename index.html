@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>频域隐式水印 · 多块大小 · Worker加速 · 视频水印 · 智能续传</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"></script>
     <style>
-        /* === 样式与原来保持一致 + 新增续传按钮智能显示 === */
+        /* === 样式保持不变 === */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -1502,6 +1499,88 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        /* 简易/专家模式 */
+        .mode-switcher {
+            display: flex;
+            gap: 4px;
+            background: #dde8f0;
+            border-radius: 60px;
+            padding: 3px;
+            margin-bottom: 8px;
+        }
+        .mode-switcher button {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 7px 12px;
+            border-radius: 60px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #4b6a84;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .mode-switcher button.active {
+            background: #7c3aed;
+            color: white;
+            box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
+        }
+        .expert-only {
+            display: none;
+        }
+        .controls.expert-mode .expert-only {
+            display: flex;
+        }
+
+        .onboarding-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .onboarding-overlay.active { display: flex; }
+        .onboarding-card {
+            background: white;
+            border-radius: 20px;
+            padding: 28px 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .onboarding-card h3 { font-size: 1.1rem; margin-bottom: 16px; color: #0b1e2e; }
+        .onboarding-steps { text-align: left; margin: 16px 0; }
+        .onboarding-steps .step {
+            padding: 10px 14px;
+            margin: 8px 0;
+            background: #f0ecf9;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            color: #2d1b4e;
+        }
+
+        .batch-report-btn {
+            background: #0d9488;
+            color: white;
+            border: none;
+            border-radius: 60px;
+            padding: 4px 12px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            margin-top: 6px;
+            display: none;
+            font-family: inherit;
+        }
+        .batch-report-btn.visible { display: inline-block; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -1510,17 +1589,11 @@
             🛡️ 频域隐式水印
             <small>· 多块大小 · 长按保存</small>
             <span class="badge-pro">PRO</span>
-            <span class="badge-batch">📦 BATCH</span>
-            <span class="badge-png">🖼️ PNG</span>
-            <span class="badge-pdf">📄 PDF</span>
-            <span class="badge-pdf-export">📤 PDF导出</span>
             <span class="badge-worker">⚡ Worker</span>
-            <span class="badge-video">🎬 视频水印</span>
-            <span class="badge-resume">⏳ 智能续传</span>
         </h1>
         <div class="sub">
-            <span>⚡ 8种块大小 · 逐个勾选 · 批量打包下载 · 导出PDF · Worker加速 · 视频水印 · 多种编码 · 智能续传</span>
-            <span class="stats" id="algoStats">DCT · 三频嵌入 · RS纠错 · PDF支持 · Web Worker · H.264/H.265/AV1/VP9</span>
+            <span>⚡ 多格式 · 批量打包 · PDF导出 · 视频水印 · 智能续传 · 分辨率可选 · 竖屏支持</span>
+            <span class="stats" id="algoStats">DCT · 三频嵌入 · 汉明纠错 · PDF支持 · Web Worker · H.264/H.265/AV1/VP9</span>
         </div>
 
         <div class="main-grid">
@@ -1588,6 +1661,7 @@
                         </div>
                     </div>
                     <div class="status-detail" id="batchStatusDetail">⏳ 准备开始...</div>
+                    <button class="batch-report-btn" id="batchReportBtn">📋 下载处理报告</button>
                 </div>
 
                 <div class="pre-download-progress" id="preDownloadProgress">
@@ -1600,7 +1674,11 @@
                 </div>
             </div>
 
-            <div class="controls">
+            <div class="controls" id="controlsPanel">
+                <div class="mode-switcher" id="modeSwitcher">
+                    <button class="active" id="simpleModeBtn">简易模式</button>
+                    <button id="expertModeBtn">专家模式</button>
+                </div>
                 <div class="control-group">
                     <label>🔑 密钥</label>
                     <input type="text" id="watermarkKey" value="UltraSecureKey2026!@#" placeholder="输入密钥">
@@ -1631,7 +1709,7 @@
                     </div>
                 </div>
 
-                <div class="double-col">
+                <div class="expert-only double-col">
                     <div class="control-group">
                         <label>强度</label>
                         <div class="range-row">
@@ -1654,13 +1732,13 @@
                     </div>
                 </div>
 
-                <div class="triple-col">
+                <div class="expert-only triple-col">
                     <div class="control-group">
                         <label>纠错</label>
                         <select id="errorCorrection">
                             <option value="none">无</option>
                             <option value="repeat">重复×3</option>
-                            <option value="rs" selected>RS(15,7)</option>
+                            <option value="rs" selected>汉明(15,8) 可纠1位</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -1682,10 +1760,26 @@
                     </div>
                 </div>
 
-                <!-- 视频导出设置 -->
+                <!-- 视频导出设置（含分辨率选择 + 竖屏支持） -->
                 <div class="video-export-settings">
                     <div class="setting-row">
                         <label>🎬 视频导出设置</label>
+                    </div>
+                    <div class="setting-row">
+                        <label>📐 输出分辨率</label>
+                        <select id="videoResolution">
+                            <option value="original" selected>🎯 保留原始分辨率 (推荐)</option>
+                            <option value="3840">4K (3840×2160)</option>
+                            <option value="2560">2K (2560×1440)</option>
+                            <option value="1920">1080p (1920×1080)</option>
+                            <option value="1280">720p (1280×720)</option>
+                            <option value="854">480p (854×480) 快速</option>
+                            <option value="640">360p (640×360) 极速</option>
+                        </select>
+                        <span style="font-size:0.55rem;color:#16a34a;">自动适配横竖屏</span>
+                    </div>
+                    <div class="setting-row" style="font-size:0.6rem;color:#4b6a84;padding:2px 4px;">
+                        📌 竖屏视频(如9:16)将保持原始比例，不会变形
                     </div>
                     <div class="setting-row">
                         <label>编码/容器</label>
@@ -1701,6 +1795,12 @@
                         <label>质量</label>
                         <input type="range" id="videoQuality" min="0.1" max="1.0" step="0.05" value="0.9" style="width:80px;">
                         <span class="range-value" id="videoQualityValue">0.9</span>
+                    </div>
+                    <div class="setting-row" style="font-size:0.65rem; color:#16a34a;">
+                        🔊 导出视频含原音频 (如原视频有音轨, 取决于浏览器支持)
+                    </div>
+                    <div class="setting-row" style="font-size:0.60rem; color:#d97706;">
+                        ⚠️ 为保证性能, 仅处理前300帧 (约10秒@30fps), 长视频后半段不含水印
                     </div>
                     <div class="setting-row" style="font-size:0.65rem; color:#4b6a84;">
                         ⚡ 视频水印: 逐帧嵌入频域水印 (使用Worker加速)
@@ -1778,7 +1878,7 @@
                 </div>
 
                 <div class="status-msg" id="statusMsg">
-                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传
+                    💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传 · 分辨率可选 · 竖屏支持
                 </div>
             </div>
         </div>
@@ -1791,6 +1891,18 @@
             <div class="zoom-watermark-badge">🛡️ 水印预览</div>
         </div>
         <div class="zoom-info" id="zoomInfo">点击任意处关闭 · 显示嵌入水印效果</div>
+    </div>
+
+    <div class="onboarding-overlay" id="onboardingOverlay">
+        <div class="onboarding-card">
+            <h3>👋 欢迎使用频域水印工具</h3>
+            <div class="onboarding-steps">
+                <div class="step">① 上传图片/PDF/视频（支持拖拽，PDF自动拆页）</div>
+                <div class="step">② 调整参数 → 点击「重新生成水印」嵌入隐式水印</div>
+                <div class="step">③ 预览确认 → 下载单张/批量打包/导出PDF/导出视频</div>
+            </div>
+            <button class="btn btn-primary" id="onboardingClose" style="width:100%;padding:10px;">我知道了</button>
+        </div>
     </div>
 
     <input type="file" id="hiddenFileInput" accept="image/*,application/pdf,video/*" multiple style="display:none;">
@@ -1879,9 +1991,11 @@
             const pdfQuality = document.getElementById('pdfQuality');
             const pdfQualityValue = document.getElementById('pdfQualityValue');
 
+            // 视频相关DOM
             const videoFormat = document.getElementById('videoFormat');
             const videoQuality = document.getElementById('videoQuality');
             const videoQualityValue = document.getElementById('videoQualityValue');
+            const videoResolution = document.getElementById('videoResolution');
 
             const extractBtn = document.getElementById('extractBtn');
             const downloadBtn = document.getElementById('downloadBtn');
@@ -1903,12 +2017,37 @@
             let idCounter = 0;
             let currentItemId = null;
             let isUploading = false;
-            let originalImageDataCache = {};
+            // LRU缓存
+            class LRUCache {
+                constructor(maxSize = 10) {
+                    this.maxSize = maxSize;
+                    this.cache = new Map();
+                }
+                get(key) {
+                    if (!this.cache.has(key)) return null;
+                    const val = this.cache.get(key);
+                    this.cache.delete(key);
+                    this.cache.set(key, val);
+                    return val;
+                }
+                set(key, val) {
+                    if (this.cache.has(key)) this.cache.delete(key);
+                    if (this.cache.size >= this.maxSize) {
+                        const oldestKey = this.cache.keys().next().value;
+                        this.cache.delete(oldestKey);
+                    }
+                    this.cache.set(key, val);
+                }
+                delete(key) { this.cache.delete(key); }
+                clear() { this.cache.clear(); }
+                has(key) { return this.cache.has(key); }
+            }
+            let originalImageDataCache = new LRUCache(10);
             let isShowingWatermarked = {};
             let paramsChanged = false;
             let currentParams = {};
             let pdfCache = {};
-            // 断点续传状态
+            let batchReportData = [];
             let resumeState = {
                 inProgress: false,
                 total: 0,
@@ -1918,10 +2057,116 @@
                 results: [],
                 cancelled: false
             };
-            // 上传失败记录
             let failedUploads = [];
 
-            // ============ Web Worker 封装 (与原来一致) ============
+            // ============ IndexedDB ============
+            let dbInstance = null;
+            function openDB() {
+                return new Promise((resolve) => {
+                    try {
+                        const req = indexedDB.open('WatermarkToolDB', 1);
+                        req.onupgradeneeded = (e) => {
+                            const db = e.target.result;
+                            if (!db.objectStoreNames.contains('resumeState')) db.createObjectStore('resumeState', { keyPath: 'id' });
+                            if (!db.objectStoreNames.contains('config')) db.createObjectStore('config', { keyPath: 'key' });
+                        };
+                        req.onsuccess = (e) => { dbInstance = e.target.result; resolve(dbInstance); };
+                        req.onerror = () => { console.warn('IndexedDB不可用'); resolve(null); };
+                    } catch(e) { console.warn('IndexedDB初始化失败:', e); resolve(null); }
+                });
+            }
+            async function saveResumeStateToDB(state) {
+                if (!dbInstance) return;
+                try {
+                    const tx = dbInstance.transaction(['resumeState'], 'readwrite');
+                    tx.objectStore('resumeState').put({ id: 'current', ...state });
+                } catch(e) { console.warn('保存续传状态失败:', e); }
+            }
+            async function loadResumeStateFromDB() {
+                if (!dbInstance) return null;
+                return new Promise((resolve) => {
+                    try {
+                        const tx = dbInstance.transaction(['resumeState'], 'readonly');
+                        const req = tx.objectStore('resumeState').get('current');
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => resolve(null);
+                    } catch(e) { resolve(null); }
+                });
+            }
+            async function clearResumeStateFromDB() {
+                if (!dbInstance) return;
+                try {
+                    const tx = dbInstance.transaction(['resumeState'], 'readwrite');
+                    tx.objectStore('resumeState').delete('current');
+                } catch(e) {}
+            }
+            function saveConfigToLS() {
+                try {
+                    const config = {
+                        key: keyInput.value,
+                        message: msgInput.value,
+                        color: watermarkColorInput.value,
+                        opacity: watermarkOpacityRange.value,
+                        strength: strengthRange.value,
+                        blockSize: blockSizeSelect.value,
+                        ecc: errorCorrectionSelect.value,
+                        midFreq: midFreqSelect.value,
+                        strategy: embedStrategySelect.value
+                    };
+                    localStorage.setItem('watermarkConfig', JSON.stringify(config));
+                } catch(e) { console.warn('配置保存失败:', e); }
+            }
+            function loadConfigFromLS() {
+                try {
+                    const raw = localStorage.getItem('watermarkConfig');
+                    if (!raw) return false;
+                    const c = JSON.parse(raw);
+                    if (c.key) keyInput.value = c.key;
+                    if (c.message) msgInput.value = c.message;
+                    if (c.color) { watermarkColorInput.value = c.color; updateColorPreview(); }
+                    if (c.opacity) { watermarkOpacityRange.value = c.opacity; opacityValue.textContent = parseFloat(c.opacity).toFixed(3); }
+                    if (c.strength) { strengthRange.value = c.strength; strengthValue.textContent = parseFloat(c.strength).toFixed(3); }
+                    if (c.blockSize) { blockSizeSelect.value = c.blockSize; blockInfo.textContent = c.blockSize + '×' + c.blockSize; }
+                    if (c.ecc) errorCorrectionSelect.value = c.ecc;
+                    if (c.midFreq) midFreqSelect.value = c.midFreq;
+                    if (c.strategy) embedStrategySelect.value = c.strategy;
+                    return true;
+                } catch(e) { return false; }
+            }
+
+            // ============ 视频格式兼容性检测 ============
+            function checkVideoFormatSupport() {
+                const formats = {
+                    'mp4': 'video/mp4; codecs="avc1.42E01E"',
+                    'hevc': 'video/mp4; codecs="hev1.1.6.L93.B0"',
+                    'av1': 'video/mp4; codecs="av01.0.05M.08"',
+                    'vp9': 'video/webm; codecs="vp9"',
+                    'webm': 'video/webm; codecs="vp8"',
+                    'mov': 'video/quicktime',
+                    'avi': 'video/x-msvideo'
+                };
+                const support = {};
+                for (const [key, mime] of Object.entries(formats)) {
+                    try { support[key] = MediaRecorder.isTypeSupported(mime); }
+                    catch(e) { support[key] = false; }
+                }
+                return support;
+            }
+            function updateVideoFormatOptions() {
+                const support = checkVideoFormatSupport();
+                const select = document.getElementById('videoFormat');
+                if (!select) return;
+                Array.from(select.options).forEach(opt => {
+                    if (!support[opt.value]) {
+                        if (!opt.textContent.includes('(不支持)')) {
+                            opt.textContent = opt.textContent + ' (不支持)';
+                        }
+                        opt.style.color = '#999';
+                    }
+                });
+            }
+
+            // ============ Web Worker 封装 ============
             let worker = null;
             let workerReady = false;
             let workerCallbacks = {};
@@ -1929,13 +2174,12 @@
             function initWorker() {
                 try {
                     const workerCode = `
-                        // ---- Worker 内部实现 (优化版: 预计算余弦LUT) ----
                         const _dctLUTCache = {};
                         function getDCTLUT(n) {
                             if (_dctLUTCache[n]) return _dctLUTCache[n];
                             const sqrt2 = Math.SQRT2;
                             const cuArr = new Float64Array(n);
-                            const cosN = new Float64Array(n * n); // cosN[i*n+j] = cos((2i+1)*j*π/(2n))
+                            const cosN = new Float64Array(n * n);
                             for (let i = 0; i < n; i++) {
                                 cuArr[i] = i === 0 ? 1 / sqrt2 : 1;
                                 for (let j = 0; j < n; j++) {
@@ -2125,7 +2369,6 @@
                                 }
                             }
 
-                            // 优化: 只计算RGB通道 (跳过alpha), 步长4
                             const len = originalData.length;
                             let mse = 0, mseCount = 0, mseReported = 0;
                             const mseChunk = Math.max(1, Math.floor(len / 200));
@@ -2295,7 +2538,6 @@
                     }
                 }
 
-                // 优化: 只计算RGB通道 (跳过alpha), 步长4
                 const len = imageData.data.length;
                 let mse = 0, mseCount = 0;
                 const mseChunk = Math.max(4, Math.floor(len / 200));
@@ -2320,9 +2562,7 @@
                 return new Promise((resolve) => { resolve(); });
             }
 
-            // ============ 工具函数 (优化版: 预计算余弦LUT + 批量像素操作) ============
-            // 预计算 n×n 余弦矩阵: cosN[i][j] = cos((2*i+1)*j*π/(2n))
-            // cu[i] = i===0 ? 1/√2 : 1
+            // ============ 工具函数 ============
             const _mainDCTLUTCache = {};
             function getMainDCTLUT(n) {
                 if (_mainDCTLUTCache[n]) return _mainDCTLUTCache[n];
@@ -2340,7 +2580,6 @@
                 return lut;
             }
 
-            // 2D DCT: F(u,v) = (2/n)*cu(u)*cu(v)*ΣxΣy f(x,y)*cos((2x+1)uπ/2n)*cos((2y+1)vπ/2n)
             function dct2d(matrix, n) {
                 const lut = getMainDCTLUT(n);
                 const result = new Float64Array(n * n);
@@ -2364,7 +2603,6 @@
                 return result;
             }
 
-            // 2D IDCT: f(x,y) = (2/n)*ΣuΣv cu(u)*cu(v)*F(u,v)*cos((2x+1)uπ/2n)*cos((2y+1)vπ/2n)
             function idct2d(dctMatrix, n) {
                 const lut = getMainDCTLUT(n);
                 const result = new Float64Array(n * n);
@@ -2523,8 +2761,11 @@
                 return chars.join('');
             }
 
-            // ============ 视频处理 (与原来一致) ============
-            async function extractVideoFrames(videoFile, maxFrames = 120) {
+            // ============ 视频处理 (修复比例失真 + 竖屏支持 + 分辨率选择) ============
+            const VIDEO_MAX_FRAMES = 300;
+
+            // ✅ 修复: 保持原始宽高比，支持竖屏视频，用户可选择分辨率
+            async function extractVideoFrames(videoFile, maxFrames = VIDEO_MAX_FRAMES, targetResolution = 'original') {
                 return new Promise((resolve, reject) => {
                     const video = document.createElement('video');
                     video.preload = 'auto';
@@ -2537,14 +2778,36 @@
                         const totalFrames = Math.min(Math.floor(duration * 30), maxFrames);
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        const w = Math.min(video.videoWidth, 640);
-                        const h = Math.min(video.videoHeight, 480);
+
+                        let w = video.videoWidth;
+                        let h = video.videoHeight;
+
+                        // 分辨率控制 - 保留原始比例
+                        if (targetResolution !== 'original' && targetResolution > 0) {
+                            const maxDim = parseInt(targetResolution);
+                            // 计算缩放比例，保持宽高比
+                            const ratio = Math.min(maxDim / Math.max(w, h), 1);
+                            if (ratio < 1) {
+                                w = Math.round(w * ratio);
+                                h = Math.round(h * ratio);
+                            }
+                        }
+
+                        // 确保宽高为偶数（编码要求）
+                        if (w % 2 !== 0) w -= 1;
+                        if (h % 2 !== 0) h -= 1;
+
+                        // 防止过小
+                        if (w < 64) w = 64;
+                        if (h < 64) h = 64;
+
                         canvas.width = w;
                         canvas.height = h;
                         const frames = [];
                         let captured = 0;
-                        const interval = duration / totalFrames;
+                        const interval = totalFrames > 0 ? duration / totalFrames : 1 / 30;
                         let currentTime = 0;
+
                         const captureFrame = () => {
                             if (captured >= totalFrames || currentTime >= duration) {
                                 URL.revokeObjectURL(url);
@@ -2556,6 +2819,12 @@
                                 ctx.drawImage(video, 0, 0, w, h);
                                 const imageData = ctx.getImageData(0, 0, w, h);
                                 frames.push(imageData);
+                                captured++;
+                                currentTime += interval;
+                                captureFrame();
+                            };
+                            video.onerror = function(e) {
+                                console.warn('视频帧提取跳过:', e);
                                 captured++;
                                 currentTime += interval;
                                 captureFrame();
@@ -2589,12 +2858,28 @@
                 return results;
             }
 
-            async function exportVideo(frames, width, height, format = 'mp4', quality = 0.9, progressCb) {
+            async function exportVideo(frames, width, height, format = 'mp4', quality = 0.9, progressCb, originalVideoEl) {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 const stream = canvas.captureStream(30);
+                let hasAudio = false;
+                if (originalVideoEl) {
+                    try {
+                        const videoStream = originalVideoEl.captureStream ? originalVideoEl.captureStream() :
+                            originalVideoEl.mozCaptureStream ? originalVideoEl.mozCaptureStream() : null;
+                        if (videoStream) {
+                            const audioTracks = videoStream.getAudioTracks();
+                            if (audioTracks.length > 0) {
+                                audioTracks.forEach(track => stream.addTrack(track));
+                                hasAudio = true;
+                                console.log('✅ 已合并音频轨道:', audioTracks.length);
+                            } else { console.warn('⚠️ 原始视频无音频轨道'); }
+                        }
+                    } catch(e) { console.warn('⚠️ 无法捕获音频 (浏览器限制):', e); }
+                }
+                if (!hasAudio) console.warn('⚠️ 导出视频不含音频');
                 let mimeType = 'video/mp4; codecs="avc1.42E01E"';
                 let ext = 'mp4';
 
@@ -2665,6 +2950,10 @@
                             return;
                         }
                         const imageData = frames[frameIndex];
+                        if (imageData.width !== canvas.width || imageData.height !== canvas.height) {
+                            canvas.width = imageData.width;
+                            canvas.height = imageData.height;
+                        }
                         ctx.putImageData(imageData, 0, 0);
                         frameIndex++;
                         if (progressCb) progressCb(Math.round((frameIndex / frames.length) * 100), `导出帧 ${frameIndex}/${frames.length}`);
@@ -2690,11 +2979,18 @@
                 const midFreqPos = midFreqSelect.value;
                 const strategy = embedStrategySelect.value;
 
+                // 获取用户选择的分辨率 (默认使用原始分辨率)
+                const targetResolution = videoResolution ? videoResolution.value : 'original';
+
                 if (progressCb) progressCb(0, '提取视频帧...');
-                const { frames, width, height, totalFrames, videoElement } = await extractVideoFrames(item.file, 120);
+                const { frames, width, height, totalFrames, videoElement } = await extractVideoFrames(
+                    item.file,
+                    VIDEO_MAX_FRAMES,
+                    targetResolution
+                );
                 if (frames.length === 0) throw new Error('视频帧提取失败');
 
-                if (progressCb) progressCb(5, `提取到 ${frames.length} 帧`);
+                if (progressCb) progressCb(5, `提取到 ${frames.length} 帧 (${width}×${height})`);
 
                 const watermarkedFrames = await embedWatermarkToVideoFrames(
                     frames, width, height, message, key, strength, blockSize,
@@ -2707,10 +3003,13 @@
                 const format = videoFormat.value;
                 const quality = parseFloat(videoQuality.value) || 0.9;
                 const { blob: videoBlob, ext } = await exportVideo(watermarkedFrames, width, height, format, quality,
-                    (pct, msg) => { if (progressCb) progressCb(85 + pct * 0.15, msg); }
+                    (pct, msg) => { if (progressCb) progressCb(85 + pct * 0.15, msg); },
+                    videoElement
                 );
 
                 if (progressCb) progressCb(100, '完成!');
+
+                frames.length = 0;
 
                 return {
                     videoBlob,
@@ -2723,7 +3022,7 @@
                 };
             }
 
-            // ============ 主线程回退实现 (与原来一致) ============
+            // ============ 主线程回退实现 ============
             async function regenerateSingleWorker(item, progressCb) {
                 if (!item) return null;
 
@@ -2791,7 +3090,7 @@
                     item.processed = true;
                     item.failed = false;
 
-                    originalImageDataCache[item.id] = imageData;
+                    originalImageDataCache.set(item.id, imageData);
                     isShowingWatermarked[item.id] = true;
 
                     updateParamsSnapshot();
@@ -2819,7 +3118,7 @@
                         tmpCtx.drawImage(reloadImg, 0, 0);
                         imgData = tmpCtx.getImageData(0, 0, item.width, item.height);
                         item.imageData = imgData;
-                        originalImageDataCache[item.id] = imgData;
+                        originalImageDataCache.set(item.id, imgData);
                     }
                     const result = await embedWatermarkToDataAsync(
                         imgData, item.width, item.height,
@@ -2833,7 +3132,7 @@
                     item.psnr = result.psnr;
                     item.processed = true;
                     item.failed = false;
-                    originalImageDataCache[item.id] = result.imageData;
+                    originalImageDataCache.set(item.id, result.imageData);
                     isShowingWatermarked[item.id] = true;
                     updateParamsSnapshot();
                     checkParamsChanged();
@@ -2842,7 +3141,7 @@
                 }
             }
 
-            // ============ 辅助函数 (与原来一致) ============
+            // ============ 辅助函数 ============
             function updateColorPreview() {
                 const color = watermarkColorInput.value;
                 colorPreview.style.background = color;
@@ -2905,7 +3204,7 @@
                     return;
                 }
                 if (item.isVideo) {
-                    blockCheckBadge.textContent = `🎬 视频 ${item.width||'?'}×${item.height||'?'}`;
+                    blockCheckBadge.textContent = `🎬 视频 ${item.videoWidth||'?'}×${item.videoHeight||'?'}`;
                     blockCheckBadge.className = 'block-check-badge ok';
                     return;
                 }
@@ -2992,8 +3291,7 @@
                     ctx.fillText('🎬 视频水印 (点击导出视频)', canvas.width/2, canvas.height/2);
                     return canvas;
                 }
-                let sourceData = (useWatermarkedData && item.watermarkedData) ? item.watermarkedData : (originalImageDataCache[
-                    item.id] || item.imageData);
+                let sourceData = (useWatermarkedData && item.watermarkedData) ? item.watermarkedData : (originalImageDataCache.get(item.id) || item.imageData);
                 if (!sourceData) return null;
                 const w = item.width,
                     h = item.height;
@@ -3074,7 +3372,7 @@
                 return canvas;
             }
 
-            // ============ 缩略图相关 (与原来一致) ============
+            // ============ 缩略图相关 ============
             function addBatchItem(file) {
                 return new Promise((resolve, reject) => {
                     if (file.type.startsWith('video/')) {
@@ -3186,7 +3484,7 @@
                                 isPDF: false,
                                 isVideo: false
                             };
-                            originalImageDataCache[item.id] = imageData;
+                            originalImageDataCache.set(item.id, imageData);
                             isShowingWatermarked[item.id] = false;
                             batchItems.push(item);
                             renderThumbnails();
@@ -3255,7 +3553,7 @@
                         pdfDoc: pdf,
                         pdfFile: file
                     };
-                    originalImageDataCache[item.id] = imageData;
+                    originalImageDataCache.set(item.id, imageData);
                     isShowingWatermarked[item.id] = false;
                     batchItems.push(item);
                     renderThumbnails();
@@ -3266,7 +3564,7 @@
                 }
             }
 
-            // ============ 修复后的上传逻辑 ============
+            // ============ 上传逻辑 ============
             let pendingUploadFiles = [];
             let uploadRetryCount = 0;
             const MAX_UPLOAD_RETRIES = 3;
@@ -3274,14 +3572,12 @@
             async function uploadFiles(files, retry = false) {
                 if (isUploading) return;
                 if (!files || files.length === 0) {
-                    // 如果有待重试的文件，尝试重试
                     if (failedUploads.length > 0 && !retry) {
                         await retryFailedUploads();
                     }
                     return;
                 }
 
-                // 过滤掉已经成功上传的文件（通过文件名和大小比对）
                 const existingNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
                 const newFiles = [];
                 for (const f of files) {
@@ -3295,7 +3591,6 @@
 
                 if (newFiles.length === 0) {
                     setStatus('⚠️ 所有文件已存在，无需重复上传', true);
-                    // 重置 input
                     hiddenFileInput.value = '';
                     return;
                 }
@@ -3337,7 +3632,6 @@
                                 } catch (pageErr) {
                                     pdfFailed++;
                                     console.error(`PDF第${pageNum}页加载失败:`, pageErr);
-                                    // 单页失败不中断整体
                                 }
                                 const donePct = Math.round(((i + 1) / total) * 100);
                                 uploadBar.style.width = donePct + '%';
@@ -3371,9 +3665,7 @@
                     }
                 }
 
-                // 更新失败列表
                 failedUploads = failedList.map(name => {
-                    // 找到对应的文件对象
                     const file = newFiles.find(f => f.name === name);
                     return { name, file, retries: 0 };
                 }).filter(item => item.file);
@@ -3399,14 +3691,10 @@
                     setStatus(`⚠️ 所有文件上传失败，点击"重试失败"按钮重新尝试`, false);
                 }
 
-                // 更新重试按钮状态
                 updateRetryButtonVisibility();
-
-                // 重置 input（重要：确保下次选择文件能触发 change 事件）
                 hiddenFileInput.value = '';
             }
 
-            // ============ 重试失败上传 ============
             async function retryFailedUploads() {
                 if (isUploading) {
                     setStatus('⏳ 正在上传中，请稍候...', true);
@@ -3419,7 +3707,6 @@
                     return;
                 }
 
-                // 过滤掉已经成功添加的文件（防止重复）
                 const existingNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
                 const toRetry = failedUploads.filter(item => {
                     const key = item.file.name + '_' + item.file.size;
@@ -3433,7 +3720,6 @@
                     return;
                 }
 
-                // 检查重试次数
                 const canRetry = toRetry.filter(item => item.retries < MAX_UPLOAD_RETRIES);
                 if (canRetry.length === 0) {
                     setStatus(`⚠️ 重试次数已达上限 (${MAX_UPLOAD_RETRIES}次)，请刷新页面后重试`, false);
@@ -3442,14 +3728,10 @@
 
                 setStatus(`🔄 正在重试 ${canRetry.length} 个失败文件...`, true);
                 const filesToUpload = canRetry.map(item => item.file);
-
-                // 增加重试计数
                 canRetry.forEach(item => item.retries++);
 
-                // 重新上传
                 await uploadFiles(filesToUpload, true);
 
-                // 清理已成功重试的文件
                 const successNames = new Set(batchItems.map(item => item.file.name + '_' + item.file.size));
                 failedUploads = failedUploads.filter(item => {
                     const key = item.file.name + '_' + item.file.size;
@@ -3459,7 +3741,6 @@
                 updateRetryButtonVisibility();
             }
 
-            // ============ 更新重试按钮可见性 ============
             function updateRetryButtonVisibility() {
                 if (failedUploads.length > 0) {
                     retryUploadBtn.classList.remove('hidden');
@@ -3469,7 +3750,7 @@
                 }
             }
 
-            // ============ 缩略图渲染 (与原来一致) ============
+            // ============ 缩略图渲染 ============
             function renderThumbnails() {
                 const fragment = document.createDocumentFragment();
                 batchItems.forEach((item, index) => {
@@ -3526,7 +3807,6 @@
                 addDiv.innerHTML = `<span class="plus">+</span>`;
                 addDiv.title = '添加图片、PDF（自动拆分多页）或视频';
                 addDiv.addEventListener('click', function(e) { e.stopPropagation();
-                    // 重置 input 以确保能触发 change
                     hiddenFileInput.value = '';
                     hiddenFileInput.click(); });
                 addDiv.addEventListener('dragover', function(e) { e.preventDefault();
@@ -3541,7 +3821,6 @@
                     this.style.background = '#f8fafd';
                     const files = e.dataTransfer.files;
                     if (files.length > 0) {
-                        // 重置 input
                         hiddenFileInput.value = '';
                         uploadFiles(files);
                     }
@@ -3570,7 +3849,7 @@
                     item.failed = false;
                     item._cacheKey = null;
                     item.name = item.file.name + ` (第${result.pageNum}页/${result.totalPages}页)`;
-                    originalImageDataCache[item.id] = result.imageData;
+                    originalImageDataCache.set(item.id, result.imageData);
                     isShowingWatermarked[item.id] = false;
                     const thumbCanvas = document.createElement('canvas');
                     const maxSize = 120;
@@ -3651,7 +3930,7 @@
                 }
                 displayVideo.style.display = 'none';
                 displayImg.style.display = 'block';
-                if (!originalImageDataCache[item.id]) originalImageDataCache[item.id] = item.imageData;
+                if (!originalImageDataCache.get(item.id)) originalImageDataCache.set(item.id, item.imageData);
                 displayImg.src = item.dataUrl;
                 displayImg.className = 'loading';
                 displayImg.style.maxHeight = '380px';
@@ -3683,7 +3962,7 @@
                 }
                 displayVideo.style.display = 'none';
                 displayImg.style.display = 'block';
-                if (!originalImageDataCache[item.id]) originalImageDataCache[item.id] = item.imageData;
+                if (!originalImageDataCache.get(item.id)) originalImageDataCache.set(item.id, item.imageData);
                 displayImg.src = item.dataUrl;
                 displayImg.className = 'loading';
                 displayImg.style.maxHeight = '380px';
@@ -3699,7 +3978,7 @@
                 updateStats();
                 updateRegenerateMode();
                 if (item.watermarkedData && item._cacheKey) {
-                    originalImageDataCache[item.id] = item.watermarkedData;
+                    originalImageDataCache.set(item.id, item.watermarkedData);
                     isShowingWatermarked[item.id] = true;
                     refreshPreview(item, true);
                     watermarkStatus.textContent = '✅ 已嵌入 (预览)';
@@ -3740,7 +4019,7 @@
             function removeBatchItem(id) {
                 const item = batchItems.find(i => i.id === id);
                 batchItems = batchItems.filter(item => item.id !== id);
-                delete originalImageDataCache[id];
+                originalImageDataCache.delete(id);
                 delete isShowingWatermarked[id];
                 if (selectedId === id) {
                     selectedId = batchItems.length > 0 ? batchItems[0].id : null;
@@ -3758,7 +4037,7 @@
             function clearBatch() {
                 batchItems = [];
                 selectedId = null;
-                originalImageDataCache = {};
+                originalImageDataCache.clear();
                 isShowingWatermarked = {};
                 pdfCache = {};
                 resumeState.items = [];
@@ -3859,7 +4138,7 @@
                 }
             }
 
-            // ============ 重新生成 (与原来一致) ============
+            // ============ 重新生成 ============
             async function regenerateSingle(item, progressCb) {
                 return regenerateSingleWorker(item, progressCb);
             }
@@ -3971,7 +4250,7 @@
                 updateResumeButtonVisibility();
             }
 
-            // ============ 提取 (与原来一致) ============
+            // ============ 提取 ============
             function performExtract(silent = false) {
                 if (!currentItemId) { if (!silent) setStatus('⚠️ 请先选择一张图片', false); return; }
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -4001,34 +4280,49 @@
                     }
                     if (positions.length === 0) { const defaultPos = Math.floor(blockSize * 0.45);
                         positions.push({ x: defaultPos, y: Math.floor(blockSize * 0.4) }); }
-                    const extractedBits = [];
+                    const coefficientValues = [];
                     const n = blockSize;
                     for (let by = 0; by < blocksPerCol; by++) {
                         for (let bx = 0; bx < blocksPerRow; bx++) {
-                            if (extractedBits.length >= 128 * 3) break;
+                            if (coefficientValues.length >= 128 * 3) break;
                             const startX = bx * blockSize;
                             const startY = by * blockSize;
                             const yBlock = extractYBlock(data, item.width, startX, startY, n);
                             const dct = dct2d(yBlock, n);
                             let sumCoeff = 0;
                             for (const pos of positions) { if (pos.x < n && pos.y < n) sumCoeff += dct[pos.x * n + pos.y]; }
-                            const avgCoeff = sumCoeff / positions.length;
-                            const bit = avgCoeff > 0.02 ? 1 : (avgCoeff < -0.02 ? 0 : (avgCoeff > 0 ? 1 : 0));
-                            extractedBits.push(bit);
+                            coefficientValues.push(sumCoeff / positions.length);
                         }
                     }
-                    const decoded = decodeWithECC(extractedBits, eccMethod);
+                    if (coefficientValues.length === 0) {
+                        if (!silent) setStatus('⚠️ 图片太小, 无法提取水印', false, 'extract');
+                        return;
+                    }
+                    const mean = coefficientValues.reduce((a, b) => a + b, 0) / coefficientValues.length;
+                    const variance = coefficientValues.reduce((a, b) => a + (b - mean) * (b - mean), 0) / coefficientValues.length;
+                    const std = Math.sqrt(variance);
+                    const confidence = std > 0 ? Math.min(1, Math.abs(mean) / std) : 0;
+                    const confidencePct = Math.round(confidence * 100);
+                    const bitResult = coefficientValues.map(c => c >= mean ? 1 : 0);
+                    const votedBits = [];
+                    const voteWindow = 16;
+                    for (let i = 0; i < bitResult.length; i += voteWindow) {
+                        const window = bitResult.slice(i, i + voteWindow);
+                        const ones = window.reduce((a, b) => a + b, 0);
+                        votedBits.push(ones > voteWindow / 2 ? 1 : 0);
+                    }
+                    const decoded = decodeWithECC(votedBits, eccMethod);
                     const msg = bitsToMessage(decoded);
                     if (msg && msg.length > 1) {
                         const cleanMsg = msg.replace(/[^\x20-\x7E]/g, '').trim();
                         if (cleanMsg.length > 0) {
-                            setStatus(`🔍 提取到: "${cleanMsg}" (bits:${decoded.length})`, true, 'extract');
-                            watermarkStatus.textContent = `🔍 "${cleanMsg}"`;
+                            setStatus('🔍 提取到: "' + cleanMsg + '" (置信度:' + confidencePct + '% mean:' + mean.toFixed(4) + ' std:' + std.toFixed(4) + ')', true, 'extract');
+                            watermarkStatus.textContent = '🔍 "' + cleanMsg + '" (' + confidencePct + '%)';
                             watermarkStatus.style.color = '#7c3aed';
                             return;
                         }
                     }
-                    if (!silent) setStatus('⚠️ 未检测到有效水印', false, 'extract');
+                    if (!silent) setStatus('⚠️ 未检测到有效水印 (置信度:' + confidencePct + '%, 需原始水印图进行比对)', false, 'extract');
                     watermarkStatus.textContent = '⚪ 未检测到';
                     watermarkStatus.style.color = '#666';
                 } catch (e) {
@@ -4037,7 +4331,7 @@
                 }
             }
 
-            // ============ 下载 (与原来一致) ============
+            // ============ 下载 ============
             function downloadSingleDirect(item) {
                 try {
                     if (item.isVideo) {
@@ -4282,7 +4576,7 @@
                             item._cacheKey =
                             `${msgInput.value}|${keyInput.value}|${strengthRange.value}|${blockSizeSelect.value}|${errorCorrectionSelect.value}|${midFreqSelect.value}|${embedStrategySelect.value}`;
                             item.psnr = result.psnr;
-                            originalImageDataCache[item.id] = result.imageData;
+                            originalImageDataCache.set(item.id, result.imageData);
                             isShowingWatermarked[item.id] = true;
                         }
                         item.processed = true;
@@ -4501,7 +4795,7 @@
                 }
             }
 
-            // ============ PDF导出 (与原来一致) ============
+            // ============ PDF导出 ============
             function getPDFPageSize() {
                 const size = pdfPageSize.value;
                 const orientation = pdfOrientation.value;
@@ -4582,7 +4876,7 @@
                 }
             }
 
-            // ============ 导出视频 (与原来一致) ============
+            // ============ 导出视频 ============
             async function exportVideoDirect() {
                 if (!currentItemId) { setStatus('⚠️ 请先选择一个视频', false); return; }
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -4604,7 +4898,7 @@
                 setStatus(`✅ 视频导出成功: ${filename}`);
             }
 
-            // ============ 重置 (与原来一致) ============
+            // ============ 重置 ============
             function resetAll() {
                 cancelResume();
                 clearBatch();
@@ -4654,20 +4948,16 @@
                 }
             });
 
-            // 修复文件输入框的 change 事件 - 每次都能触发
             hiddenFileInput.addEventListener('change', function(e) {
                 const files = e.target.files;
                 if (files && files.length > 0) {
                     uploadFiles(files);
                 }
-                // 重要：立即重置 value，确保下次选择相同文件也能触发 change
-                // 但需要延迟重置，避免影响当前上传
                 setTimeout(() => {
                     hiddenFileInput.value = '';
                 }, 100);
             });
 
-            // 重试按钮
             retryUploadBtn.addEventListener('click', function() {
                 retryFailedUploads();
             });
@@ -4745,7 +5035,7 @@
             deselectAllBtn.addEventListener('click', deselectAllItems);
             resumeBatchBtn.addEventListener('click', resumeBatchProcessing);
 
-            // 放大 (与原来一致)
+            // 放大
             function openZoom() {
                 if (!currentItemId) return;
                 const item = batchItems.find(i => i.id === currentItemId);
@@ -4791,15 +5081,101 @@
             pdfQuality.addEventListener('input', function() { pdfQualityValue.textContent = parseFloat(this.value)
                     .toFixed(2); });
 
+            // 简易/专家模式
+            const controlsPanel = document.getElementById('controlsPanel');
+            const simpleModeBtn = document.getElementById('simpleModeBtn');
+            const expertModeBtn = document.getElementById('expertModeBtn');
+
+            function setMode(expert) {
+                if (expert) {
+                    controlsPanel.classList.add('expert-mode');
+                    expertModeBtn.classList.add('active');
+                    simpleModeBtn.classList.remove('active');
+                    localStorage.setItem('watermarkMode', 'expert');
+                } else {
+                    controlsPanel.classList.remove('expert-mode');
+                    simpleModeBtn.classList.add('active');
+                    expertModeBtn.classList.remove('active');
+                    localStorage.setItem('watermarkMode', 'simple');
+                }
+            }
+            if (simpleModeBtn) simpleModeBtn.addEventListener('click', function() { setMode(false); });
+            if (expertModeBtn) expertModeBtn.addEventListener('click', function() { setMode(true); });
+
+            // 新手引导
+            function showOnboarding() {
+                const overlay = document.getElementById('onboardingOverlay');
+                if (overlay) overlay.classList.add('active');
+            }
+            const onboardingCloseBtn = document.getElementById('onboardingClose');
+            if (onboardingCloseBtn) {
+                onboardingCloseBtn.addEventListener('click', function() {
+                    document.getElementById('onboardingOverlay').classList.remove('active');
+                    localStorage.setItem('watermarkOnboarded', '1');
+                });
+            }
+
+            // 批量处理报告导出
+            function downloadBatchReport(results) {
+                if (!results || results.length === 0) return;
+                var report = results.map(function(r) {
+                    return {
+                        filename: r.name || 'unknown',
+                        type: r.isVideo ? 'video' : (r.isPDF ? 'pdf' : 'image'),
+                        status: r.success ? 'success' : 'failed',
+                        psnr: r.psnr ? parseFloat(r.psnr).toFixed(2) : 'N/A',
+                        error: r.error || '',
+                        timestamp: new Date().toISOString()
+                    };
+                });
+                var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                var link = document.createElement('a');
+                link.download = 'watermark_batch_report_' + Date.now() + '.json';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function() { URL.revokeObjectURL(link.href); }, 5000);
+                setStatus('批量处理报告已下载 (' + report.length + ' 条记录)');
+            }
+            var batchReportBtn = document.getElementById('batchReportBtn');
+            if (batchReportBtn) {
+                batchReportBtn.addEventListener('click', function() {
+                    downloadBatchReport(batchReportData);
+                });
+            }
+
             // ============ 初始化 ============
-            function init() {
+            async function init() {
                 blockInfo.textContent = '16×16';
                 updateColorPreview();
                 renderThumbnails();
                 updateRegenerateMode();
-                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传');
-                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动 · 智能续传已集成 · 上传修复');
+                setStatus('💡 点击 + 占位图上传 · 支持图片、PDF（自动拆分多页）· 支持视频 (H.264/H.265/AV1/VP9/VP8/MOV/AVI) · Worker加速 · 智能续传 · 分辨率可选 · 竖屏支持');
+                console.log('🛡️ 频域隐式水印 · 视频水印版 (多编码) 已启动 · 智能续传已集成 · 上传修复 · 视频比例修复 · 分辨率可选 · 竖屏支持');
                 initWorker();
+                updateVideoFormatOptions();
+                loadConfigFromLS();
+                var savedMode = localStorage.getItem('watermarkMode');
+                if (savedMode === 'expert') setMode(true); else setMode(false);
+                await openDB();
+                if (dbInstance) {
+                    var saved = await loadResumeStateFromDB();
+                    if (saved && saved.pendingCount > 0) {
+                        setStatus('💡 检测到上次有 ' + saved.pendingCount + ' 个未完成任务 (配置已恢复)');
+                    }
+                }
+                if (!localStorage.getItem('watermarkOnboarded')) {
+                    showOnboarding();
+                }
+                [keyInput, msgInput, watermarkColorInput, watermarkOpacityRange, strengthRange,
+                 blockSizeSelect, errorCorrectionSelect, midFreqSelect, embedStrategySelect].forEach(function(el) {
+                    if (!el) return;
+                    el.addEventListener('change', saveConfigToLS);
+                    if (el.type === 'range' || el.type === 'text' || el.type === 'color') {
+                        el.addEventListener('input', saveConfigToLS);
+                    }
+                });
                 if (typeof JSZip === 'undefined') {
                     console.warn('⚠️ JSZip 库未加载');
                     setStatus('⚠️ JSZip 库加载中，请刷新后重试...', false);
@@ -4810,16 +5186,14 @@
                 else console.log('✅ jsPDF 已加载');
                 ensureLongPressSave();
                 if (isWechat()) {
-                    setTimeout(() => { showLongPressHint(true);
-                        setTimeout(() => showLongPressHint(false), 3000); }, 1000);
+                    setTimeout(function() { showLongPressHint(true);
+                        setTimeout(function() { showLongPressHint(false); }, 3000); }, 1000);
                 }
                 blockCheckBadge.textContent = '⏳ 请选择内容';
                 blockCheckBadge.className = 'block-check-badge';
                 resumeStatus.textContent = '⏸️ 续传就绪';
                 updateResumeButtonVisibility();
                 updateRetryButtonVisibility();
-
-                // 清理 input
                 hiddenFileInput.value = '';
             }
 
